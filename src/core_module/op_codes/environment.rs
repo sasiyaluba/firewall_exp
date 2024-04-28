@@ -84,7 +84,7 @@ pub fn calldataload(runner: &mut Runner) -> Result<(), ExecutionError> {
     let calldata:[u8; 32] = calldata.as_slice().try_into().unwrap();
     // let result = runner.stack.push(calldata);
 
-    // add calldata
+    /// todo! add calldata
     let origin_data_exist = runner.calldata_info.clone();
     let result = if origin_data_exist.is_some() {
         let origin_data = origin_data_exist.unwrap().origin;

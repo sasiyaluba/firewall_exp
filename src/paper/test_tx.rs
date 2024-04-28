@@ -17,6 +17,12 @@ use dotenv::dotenv;
 use std::env;
 use crate::bytes::_hex_string_to_bytes;
 
+
+// 需要传入的数据为rpc, tx_hash, 要监控的函数字符串, 参数位置，(未解决的问题: 不变量如何传入)
+// 参数变异策略
+// 路径对比策略
+// 需要有选择性的更改执行的上下文
+
 #[tokio::test]
 async fn test_tx_state() -> Result<(), ProviderError> {
 
@@ -90,7 +96,8 @@ async fn test_tx_state() -> Result<(), ProviderError> {
     calldata_info.origin = origin_data.clone();
     println!("{:?}", calldata_info.origin);
     interpreter.calldata_info = Some(calldata_info);
-    //
+
+
     // exec bytecode
     let bytecode = accounts_state_pre_tx
         .get(&Address::from_slice(&transaction_content.to.unwrap()))
