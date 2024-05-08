@@ -1,29 +1,24 @@
-use std::env;
-use std::str::FromStr;
-use std::sync::Arc;
-use dotenv::dotenv;
-use ethers::addressbook::Address;
-use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash};
 use crate::bytes::{_hex_string_to_bytes, to_h256};
-use crate::core_module::context::account_state_ex_context::{get_accounts_state_tx, get_tx_after_accounts_state, ISDiff};
-use crate::core_module::context::transaction_context::get_transaction_content;
-use crate::{EvmState, Runner};
+use crate::core_module::context::account_state_ex_context::{
+    get_accounts_state_tx, get_tx_after_accounts_state, ISDiff,
+};
 use crate::core_module::context::calldata_info::CallDataInfo;
 use crate::core_module::context::evm_context::EvmContext;
+use crate::core_module::context::transaction_context::get_transaction_content;
 use crate::paper::evm_interpreter::get_evm_interpreter::get_evm_interpreter;
 use crate::paper::strategy::param_strategy::ParamStrategy;
 use crate::paper::strategy::path_strategy::PathStrategy;
-
+use crate::{EvmState, Runner};
+use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash};
 
 pub async fn exec(
     _rpc: &str,
     _tx_hash: &str,
     _function_selector: &str,
     _index: u8,
-    _path_strategy: Option<PathStrategy>,// 默认为全路径匹配策略
-    _param_strategy: Option<ParamStrategy>
+    _path_strategy: Option<PathStrategy>, // 默认为全路径匹配策略
+    _param_strategy: Option<ParamStrategy>,
 ) -> Result<Vec<Vec<u8>>, ProviderError> {
-
     // 1. 得到路径约束策略
 
     // 2. 得到参数枚举策略
@@ -40,8 +35,8 @@ async fn exec_internal(
     _param_origin_data: Vec<u8>,
     _all_possible_param_list: Vec<Vec<u8>>,
     _constraint_path: Option<Vec<&'static str>>,
-    _multi_thread: Option<bool>) -> Result<Vec<Vec<u8>>, ProviderError>
-{
+    _multi_thread: Option<bool>,
+) -> Result<Vec<Vec<u8>>, ProviderError> {
     let mut interpreter = get_evm_interpreter(_rpc, _tx_hash).await.unwrap();
 
     // 1. 将路约束加载进入到对应的interpreter
@@ -60,7 +55,7 @@ async fn exec_internal(
     } else {
         for new_param in _all_possible_param_list {
             // Interpret the bytecode
-            let ret = interpreter.interpret_init(bytecode.clone(),new_param.clone(), true);
+            let ret = interpreter.interpret_init(bytecode.clone(), new_param.clone(), true);
             if ret.is_ok() {
                 println!("{:?}", interpreter.op_list.len());
                 return_param_list.push(new_param.clone());

@@ -1,12 +1,8 @@
-use std::collections::HashSet;
 use reqwest::Client;
 use serde_json::{json, Value};
-use std::fs;
+use std::collections::HashSet;
 
-use ethers::core::k256::sha2::digest::typenum::op;
 use crate::bytes::_hex_string_to_bytes;
-
-
 
 // 将call_tracer里面的信息全部读取到一个list里面
 fn recursive_read_input(data: &Value) -> Vec<String> {
@@ -28,24 +24,30 @@ fn recursive_read_input(data: &Value) -> Vec<String> {
     ret_calldata
 }
 
-fn func_name_to_selector(func_name_str: &str) -> String{
+fn func_name_to_selector(func_name_str: &str) -> String {
     let selector = &ethers::core::utils::keccak256(func_name_str)[0..4];
     // 将十进制数组转换为十六进制字符串
-    let selector_str: String = ["0x", &selector
-        .iter()
-        .map(|&x| format!("{:02X}", x).to_lowercase())
-        .collect::<Vec<String>>()
-        .join("")]
-        .concat();
+    let selector_str: String = [
+        "0x",
+        &selector
+            .iter()
+            .map(|&x| format!("{:02X}", x).to_lowercase())
+            .collect::<Vec<String>>()
+            .join(""),
+    ]
+    .concat();
 
     println!("{:?}", selector_str);
     selector_str
 }
 
-
 // func_name_str ""
-async fn get_origin_calldata(_rpc: &str, _attack_hash: &str, func_name_str: &str, _index: u8) -> Vec<u8>{
-
+async fn get_origin_calldata(
+    _rpc: &str,
+    _attack_hash: &str,
+    func_name_str: &str,
+    _index: u8,
+) -> Vec<u8> {
     // 拿到 call_tracer
     let client = Client::new();
 
@@ -61,10 +63,11 @@ async fn get_origin_calldata(_rpc: &str, _attack_hash: &str, func_name_str: &str
             ]
         }))
         .send()
-        .await.expect("rpc error");
+        .await
+        .expect("rpc error");
     let tracer_data = res.json::<Value>().await.expect("json lib error");
 
-    let mut param_data:Vec<u8> = Vec::new();
+    let mut param_data: Vec<u8> = Vec::new();
     if tracer_data["result"]["failed"].eq(&true) {
         return param_data;
     }
@@ -87,7 +90,6 @@ async fn get_origin_calldata(_rpc: &str, _attack_hash: &str, func_name_str: &str
     // 将 HashSet 转换回 Vec
     let origin_calldata_param: Vec<String> = unique_calldata_param.into_iter().collect();
 
-
     // 计算起始位置和结束位置 0x + 4_bytes_function_selector
     let start_position = (2 + 8 + (_index - 1) * 64) as usize;
     let end_position = start_position + 64;
@@ -97,7 +99,6 @@ async fn get_origin_calldata(_rpc: &str, _attack_hash: &str, func_name_str: &str
     let index_param_value_bytes = _hex_string_to_bytes(index_param_value);
 
     index_param_value_bytes
-
 }
 
 #[tokio::test]
@@ -105,6 +106,6 @@ async fn test_get_opcode_list() {
     let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
 
-    let origin_param_data = get_origin_calldata(rpc, attack_hash, "redeem(address,uint256)", 2).await;
-
+    let origin_param_data =
+        get_origin_calldata(rpc, attack_hash, "redeem(address,uint256)", 2).await;
 }

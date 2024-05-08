@@ -1,7 +1,5 @@
 use reqwest::Client;
 use serde_json::{json, Value};
-use std::fs;
-use ethers::core::k256::sha2::digest::typenum::op;
 
 fn extract_op_values(logs: &Value) -> Vec<String> {
     let mut op_values = Vec::new();
@@ -18,7 +16,6 @@ fn extract_op_values(logs: &Value) -> Vec<String> {
 
 // get_op_code_list ["PUSH1", "PUSH1", "MSTORE", "PUSH1", "CALLDATASIZE", "LT"]
 pub async fn get_opcode_list(_rpc: &str, _attack_hash: &str) -> Vec<String> {
-
     let client = Client::new();
 
     let res = client
@@ -38,10 +35,11 @@ pub async fn get_opcode_list(_rpc: &str, _attack_hash: &str) -> Vec<String> {
             ]
         }))
         .send()
-        .await.expect("rpc error");
+        .await
+        .expect("rpc error");
     let tracer_data = res.json::<Value>().await.expect("json lib error");
 
-    let mut opcode_list:Vec<String> = Vec::new();
+    let mut opcode_list: Vec<String> = Vec::new();
     if tracer_data["result"]["failed"].eq(&true) {
         return opcode_list;
     }
@@ -53,7 +51,6 @@ pub async fn get_opcode_list(_rpc: &str, _attack_hash: &str) -> Vec<String> {
 
 #[tokio::test]
 async fn test_get_opcode_list() {
-
     let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
 
