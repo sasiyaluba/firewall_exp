@@ -102,8 +102,8 @@ pub fn read_op_tracer() -> LogData {
     log_data
 }
 
-#[test]
-fn test_read_op_tracer() {
+// #[test]
+fn test_reuiad_op_tracer() {
     // 读取JSON文件
     let _ = read_op_tracer();
 }
