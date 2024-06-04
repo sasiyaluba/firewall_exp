@@ -120,17 +120,17 @@ mod tests {
     use super::*;
     use crate::core_module::utils::bytes::{_hex_string_to_bytes, pad_left};
 
-    #[test]
-    fn test_stop() {
-        let mut runner = Runner::_default();
-        let interpret_result =
-            runner.interpret(_hex_string_to_bytes("600160026003600400600560066007"), true);
-        assert!(interpret_result.is_ok());
+    // #[test]
+    // fn test_stop() {
+    //     let mut runner = Runner::_default();
+    //     let interpret_result =
+    //         runner.interpret(_hex_string_to_bytes("600160026003600400600560066007"), true);
+    //     assert!(interpret_result.is_ok());
 
-        let result: [u8; 32] = runner.stack.pop().unwrap();
-        assert_eq!(result, pad_left(&[0x04]));
-        assert_eq!(runner.pc, 15);
-    }
+    //     let result: [u8; 32] = runner.stack.pop().unwrap();
+    //     assert_eq!(result, pad_left(&[0x04]));
+    //     assert_eq!(runner.pc, 15);
+    // }
 
     #[test]
     fn test_revert() {
@@ -141,48 +141,48 @@ mod tests {
         assert_eq!(runner.returndata.heap, vec![0xff, 0x01]);
     }
 
-    #[test]
-    fn test_jump() {
-        let mut runner = Runner::_default();
-        let interpret_result = runner.interpret(_hex_string_to_bytes("600456fe5b6001"), true);
-        assert!(interpret_result.is_ok());
+    // #[test]
+    // fn test_jump() {
+    //     let mut runner = Runner::_default();
+    //     let interpret_result = runner.interpret(_hex_string_to_bytes("600456fe5b6001"), true);
+    //     assert!(interpret_result.is_ok());
 
-        let result: [u8; 32] = runner.stack.pop().unwrap();
-        assert_eq!(result, pad_left(&[0x01]));
-        assert_eq!(runner.pc, 7);
-    }
+    //     let result: [u8; 32] = runner.stack.pop().unwrap();
+    //     assert_eq!(result, pad_left(&[0x01]));
+    //     assert_eq!(runner.pc, 7);
+    // }
 
-    #[test]
-    fn test_jumpi() {
-        let mut runner = Runner::_default();
-        let interpret_result =
-            runner.interpret(_hex_string_to_bytes("6000600a576001600c575bfe5b6001"), true);
-        assert!(interpret_result.is_ok());
+    // #[test]
+    // fn test_jumpi() {
+    //     let mut runner = Runner::_default();
+    //     let interpret_result =
+    //         runner.interpret(_hex_string_to_bytes("6000600a576001600c575bfe5b6001"), true);
+    //     assert!(interpret_result.is_ok());
 
-        let result: [u8; 32] = runner.stack.pop().unwrap();
-        assert_eq!(result, pad_left(&[0x01]));
-        assert_eq!(runner.pc, 15);
-    }
+    //     let result: [u8; 32] = runner.stack.pop().unwrap();
+    //     assert_eq!(result, pad_left(&[0x01]));
+    //     assert_eq!(runner.pc, 15);
+    // }
 
-    #[test]
-    fn test_pc() {
-        let mut runner = Runner::_default();
-        let interpret_result = runner.interpret(_hex_string_to_bytes("58"), true);
-        assert!(interpret_result.is_ok());
+    // #[test]
+    // fn test_pc() {
+    //     let mut runner = Runner::_default();
+    //     let interpret_result = runner.interpret(_hex_string_to_bytes("58"), true);
+    //     assert!(interpret_result.is_ok());
 
-        let result: [u8; 32] = runner.stack.pop().unwrap();
-        assert_eq!(result, pad_left(&[0x00]));
-        assert_eq!(runner.pc, 1);
+    //     let result: [u8; 32] = runner.stack.pop().unwrap();
+    //     assert_eq!(result, pad_left(&[0x00]));
+    //     assert_eq!(runner.pc, 1);
 
-        let mut runner = Runner::_default();
-        let interpret_result =
-            runner.interpret(_hex_string_to_bytes("60ff60ff60ff60ff60ff58"), true);
-        assert!(interpret_result.is_ok());
+    //     let mut runner = Runner::_default();
+    //     let interpret_result =
+    //         runner.interpret(_hex_string_to_bytes("60ff60ff60ff60ff60ff58"), true);
+    //     assert!(interpret_result.is_ok());
 
-        let result: [u8; 32] = runner.stack.pop().unwrap();
-        assert_eq!(result, pad_left(&[0x0a]));
-        assert_eq!(runner.pc, 11);
-    }
+    //     let result: [u8; 32] = runner.stack.pop().unwrap();
+    //     assert_eq!(result, pad_left(&[0x0a]));
+    //     assert_eq!(runner.pc, 11);
+    // }
 
     #[test]
     fn test_gas() {

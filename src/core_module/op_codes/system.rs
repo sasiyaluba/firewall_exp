@@ -7,11 +7,11 @@ use crate::core_module::utils::environment::{
 use crate::core_module::utils::errors::ExecutionError;
 
 // Primitive types
-use ethers::types::{U256};
+use ethers::types::U256;
 
+use crate::core_module::utils;
 use ethers::utils::keccak256;
 use revm_primitives::Address;
-use crate::core_module::utils;
 
 pub fn invalid(runner: &mut Runner) -> Result<(), ExecutionError> {
     Err(ExecutionError::InvalidOpcode(runner.bytecode[runner.pc]))
@@ -28,10 +28,7 @@ pub fn create(runner: &mut Runner) -> Result<(), ExecutionError> {
     let init_code = unsafe { runner.memory.read(offset.as_usize(), size.as_usize())? };
 
     // 使用Address的官方地址计算
-    let nonce = get_nonce(
-        runner.address,
-        runner,
-    )?;
+    let nonce = get_nonce(runner.address, runner)?;
     let nonce = U256::from_big_endian(&nonce).0[0];
     let caller = &runner.caller;
     let create_address = Address::from_slice(caller).create(nonce);
@@ -80,7 +77,6 @@ pub fn create2(runner: &mut Runner) -> Result<(), ExecutionError> {
     let caller = &runner.caller;
     // caller, salt, A
     let create_address = Address::from_slice(caller).create2(salt, init_code_hash);
-
 
     // Create the contract with init code as code
     init_account(*create_address.0, runner)?;

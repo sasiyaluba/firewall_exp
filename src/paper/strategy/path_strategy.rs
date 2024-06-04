@@ -49,7 +49,7 @@ pub async fn get_path_strategy(
     ret_path_strategy
 }
 
-#[tokio::test]
+// #[tokio::test]
 pub async fn test_get_path_strategy() {
     // let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let rpc = "https://blue-quiet-surf.quiknode.pro/ac44441c600862066c752e9d83b7aefb0532f03b/";
@@ -91,7 +91,7 @@ pub async fn test_get_path_strategy() {
         return;
     }
 }
-#[tokio::test]
+// #[tokio::test]
 pub async fn test_get_path_strategy1() {
     // let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let rpc = "https://blue-quiet-surf.quiknode.pro/ac44441c600862066c752e9d83b7aefb0532f03b/";
