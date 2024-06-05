@@ -1,7 +1,7 @@
+use crate::paper::strategy::simiarity::read_op_from_file;
 use crate::paper::tx_origin_data::get_origin_oplist::get_opcode_list;
 use std::fs::File;
-use std::io::Write;
-use crate::paper::strategy::simiarity::read_op_from_file; // Import the Write trait
+use std::io::Write; // Import the Write trait
 pub enum PathStrategy {
     FullPathMatch,
     ControlFlowMatch,
@@ -133,4 +133,3 @@ pub async fn test_get_path_strategy1() {
         return;
     }
 }
-
