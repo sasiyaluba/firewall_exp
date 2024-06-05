@@ -6,7 +6,7 @@ use super::utils;
 use super::utils::environment::{increment_nonce, init_account};
 use super::utils::errors::ExecutionError;
 use crate::core_module::utils::bytes::_hex_string_to_bytes;
-use ethers::abi::{Address, Hash};
+use ethers::abi::{Address, Hash, Item};
 use ethers::types::U256;
 use ethers::utils::keccak256;
 use std::collections::HashMap;
@@ -58,7 +58,9 @@ pub struct Runner {
     // constraint path
     pub constraint_path: Option<Vec<&'static str>>,
 }
-
+pub fn convert_array_to_hex(array: &[u8]) -> String {
+    array.iter().map(|x| format!("{:02x}", x)).collect()
+}
 /// Implementation of the Runner struct, which is responsible for executing EVM bytecode.
 impl Runner {
     pub fn new(
@@ -316,7 +318,7 @@ impl Runner {
         }
 
         let mut error: Option<ExecutionError> = None;
-        let mut file = OpenOptions::new().append(true).open("debug.txt").unwrap();
+        // let mut file = OpenOptions::new().append(true).open("debug.txt").unwrap();
 
         // Interpret the bytecode
         while self.pc < self.bytecode.len() {
@@ -331,18 +333,29 @@ impl Runner {
 
             // Interpret an opcode
             let opcode = get_op_code(self.bytecode[self.pc]);
-            if opcode.eq("CALL") {
-                writeln!(file, "caller {:?} callee {:?}", self.caller, self.address)
-                    .expect("write error");
-            }
+            // if opcode.eq("CALL") {
+            //     writeln!(file, "caller {:?} callee {:?}", self.caller, self.address)
+            //         .expect("write error");
+            // }
             self.op_list.push(opcode);
+            println!("op {:?}", opcode);
+            if opcode.eq("RETURN") {
+                println!("here");
+            }
             let result = self.interpret_op_code(self.bytecode[self.pc]);
+
             // debug
             // writeln!(file, "Op {} ", opcode).expect("write error");
             // writeln!(file, "Stack {:?} ", self.stack).expect("write error");
             // writeln!(file, "Memory {:?} ", self.memory).expect("write error");
             // writeln!(file, "Op {} ", opcode).expect("write error");
-
+            let mut s = String::new();
+            for Item in &self.stack.stack {
+                s = s + &convert_array_to_hex(Item).as_str() + ",";
+            }
+            println!("after op stack {:?}", s);
+            let s1 = convert_array_to_hex(&self.memory.heap);
+            println!("after op memory {:?}", &s1);
             if result.is_err() {
                 error = Some(result.unwrap_err());
                 break;
@@ -723,10 +736,7 @@ impl Runner {
 
         // Get the return data
         let return_data = self.returndata.heap.clone();
-        println!(
-            "return data{:?}:",
-            U256::from_big_endian(return_data.as_slice())
-        );
+        println!("return data{:?}:", return_data);
         // Restore the initial runner state
         if !delegate {
             self.caller = initial_caller;

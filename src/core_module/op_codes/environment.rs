@@ -747,39 +747,41 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_returndatasize() {
-    //     let mut runner = Runner::_default();
+    #[test]
+    fn test_returndatasize() {
+        let mut runner = Runner::_default();
 
-    //     // Create a contract that return 0x20 sized data and call it
-    //     let interpret_result = runner.interpret(
-    //         _hex_string_to_bytes("7f7f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6000527fff6000527fff60005260206000f30000000000000000000000000000000000006020527f000000000060205260296000f300000000000000000000000000000000000000604052604d60006000f060006000600060008463fffffffffa3d"),
-    //         true
-    //     );
-    //     assert!(interpret_result.is_ok());
+        // Create a contract that return 0x20 sized data and call it
+        let interpret_result = runner.interpret(
+            _hex_string_to_bytes("7f7f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6000527fff6000527fff60005260206000f30000000000000000000000000000000000006020527f000000000060205260296000f300000000000000000000000000000000000000604052604d60006000f060006000600060008463fffffffffa3d"),
+            true
+        );
 
-    //     let result = runner.stack.pop().unwrap();
-    //     assert_eq!(result, pad_left(&[0x20]));
-    // }
+        assert!(interpret_result.is_ok());
 
-    // #[test]
-    // fn test_returndatacopy() {
-    //     let mut runner = Runner::_default();
+        let result = runner.stack.pop().unwrap();
+        println!("{:?}", result);
+        assert_eq!(result, pad_left(&[0x20]));
+    }
 
-    //     // Create a contract that return 0x20 sized data and call it
-    //     let interpret_result = runner.interpret(
-    //         _hex_string_to_bytes("7f7f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6000527fff6000527fff60005260206000f30000000000000000000000000000000000006020527f000000000060205260296000f300000000000000000000000000000000000000604052604d60006000f060006000600060008463fffffffffa50506000600052600060205260006040526020600060003e6001601f60203e"),
-    //         true
-    //     );
-    //     assert!(interpret_result.is_ok());
+    #[test]
+    fn test_returndatacopy() {
+        let mut runner = Runner::_default();
 
-    //     let result = unsafe { runner.memory.read(0x00, 0x20).unwrap() };
-    //     assert_eq!(result, [0xff; 32]);
-    //     let result = unsafe { runner.memory.read(0x20, 0x20).unwrap() };
-    //     assert_eq!(result, _pad_right(&[0xff]));
-    //     let result = unsafe { runner.memory.read(0x40, 0x20).unwrap() };
-    //     assert_eq!(result, [0x00; 32]);
-    // }
+        // Create a contract that return 0x20 sized data and call it
+        let interpret_result = runner.interpret(
+            _hex_string_to_bytes("7f7f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff6000527fff6000527fff60005260206000f30000000000000000000000000000000000006020527f000000000060205260296000f300000000000000000000000000000000000000604052604d60006000f060006000600060008463fffffffffa50506000600052600060205260006040526020600060003e6001601f60203e"),
+            true
+        );
+        assert!(interpret_result.is_ok());
+
+        let result = unsafe { runner.memory.read(0x00, 0x20).unwrap() };
+        assert_eq!(result, [0xff; 32]);
+        let result = unsafe { runner.memory.read(0x20, 0x20).unwrap() };
+        assert_eq!(result, _pad_right(&[0xff]));
+        let result = unsafe { runner.memory.read(0x40, 0x20).unwrap() };
+        assert_eq!(result, [0x00; 32]);
+    }
 
     #[test]
     fn test_extcodehash() {
