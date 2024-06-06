@@ -75,8 +75,7 @@ fn func_name_to_selector(func_name_str: &str) -> String {
     selector_str
 }
 
-// func_name_str ""
-///@param _index表示目标参数在函数中的位置
+
 async fn get_origin_calldata(
     _rpc: &str,
     _attack_hash: &str,
@@ -140,13 +139,14 @@ async fn get_origin_calldata(
     index_param_value_bytes
 }
 
+
 async fn get_origin_calldata_to(
     _rpc: &str,
     _attack_hash: &str,
-    func_name_str: &str,
-    _index: u8,
+    _index: usize,
     to: &str,
-) -> Vec<u8> {
+    param_range: Vec<String>,
+) -> Vec<String> {
     // 拿到 call_tracer
     let client = Client::new();
 
@@ -166,27 +166,34 @@ async fn get_origin_calldata_to(
         .expect("rpc error");
     let tracer_data = res.json::<Value>().await.expect("json lib error");
 
-    let mut param_data: Vec<u8> = Vec::new();
+    let mut param_data = Vec::new();
     if tracer_data["result"]["failed"].eq(&true) {
         return param_data;
     }
 
+    let mut new_inputdatas = Vec::new();
     let call_data = tracer_data["result"].clone();
 
-    let input_data_list = recursive_read_input_targetAddress(&call_data, to).unwrap();
-    println!("The inputdata is :{:?}", input_data_list);
+    // 获取完整的 old_inputdata
+    let old_inputdata: Vec<String> = recursive_read_input_targetAddress(&call_data, to).unwrap();
 
-    let func_selector = func_name_to_selector(func_name_str);
+    // 确保 _index 合法
+    // _index从1开始指示要替换的参数位于当前函数中的哪个位置
+    // param_offset要替换数据在calldata中的起始位置
+    let param_offset = 10 + (_index - 1) * 64;
+    if old_inputdata.is_empty() || param_offset >= old_inputdata[0].len() {
+        panic!("Invalid index or empty input data");
+    }
 
-    // 计算起始位置和结束位置 0x + 4_bytes_function_selector
-    let start_position = (2 + 8 + (_index - 1) * 64) as usize;
-    let end_position = start_position + 64;
+    // 替换 param_range 中的每个元素到指定位置
+    for i in &param_range {
+        let mut new_inputdata = old_inputdata[0].clone();
+        let padded_i = format!("{:0>64}", i); // 确保 i 是64位长
+        new_inputdata.replace_range(param_offset..param_offset + 64, &padded_i);
+        new_inputdatas.push(new_inputdata);
+    }
 
-    // 截取子字符串
-    let index_param_value = &input_data_list[0][start_position..end_position];
-    let index_param_value_bytes = _hex_string_to_bytes(index_param_value);
-
-    index_param_value_bytes
+    new_inputdatas
 }
 
 fn Fill_param(paramType: &str, param_Range: Value_range) -> Vec<String> {
@@ -212,20 +219,24 @@ async fn test_get_opcode_list() {
     let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
 
-    let origin_param_data = get_origin_calldata_to(
-        rpc,
-        attack_hash,
-        "redeem(address,uint256)",
-        1,
-        "0x007fe7c498a2cf30971ad8f2cbc36bd14ac51156",
-    )
-    .await;
+    let origin_param_data =
+        get_origin_calldata(rpc, attack_hash, "redeem(address,uint256)", 1).await;
     println!("origin inputdata is: {:?}", origin_param_data);
 }
 
 #[tokio::test]
 async fn test_get_target_address_input() {
-    //获取第一个目标地址为to地址的inputdata
+    //生成表达式，求解参数范围
+    let test_expression =
+        vec!["(declare-const fundsAmount Int) (assert (>= (- 3 fundsAmount) 1))".to_string()];
+    let mut exp1 = RangeExpression::new(test_expression, "is alright".to_string());
+    let mut result = exp1.test_getRange();
+    println!("In this case, our Value_range is :{:?}", result);
+
+    //将参数范围中的每一个元素进行encode填充至32字节
+    let padded_params = Fill_param("uint256", result);
+
+    //获取替换后的inputdata
     let rpc_sepolia = "https://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
     let attack_hash2 = "0x78815002807ae469c843ffb6a9f17f2836d0dc70a033e3d0b77514a2fd23c0c0";
 
@@ -234,16 +245,12 @@ async fn test_get_target_address_input() {
     let origin_param_data = get_origin_calldata_to(
         rpc_sepolia,
         attack_hash2,
-        "getFunds(uint256,address,uint256)",
         1,
         "0x42c1c8bf2c0244bbe7755e592252992f580daaf4",
+        padded_params,
     )
     .await;
-
-    println!(
-        "The target param in origin inputdata is: {:?}",
-        origin_param_data
-    );
+    println!("The target param in origin inputdata is: {:?}",origin_param_data);
 }
 
 #[tokio::test]
@@ -258,8 +265,7 @@ async fn test_change_param() {
 
     //将参数范围中的每一个元素进行encode
     let padded_params = Fill_param("uint256", result);
-    println!("填充之后的参数列表")
+    println!("填充之后的参数列表:{:?}", padded_params);
 
     //next:将这些参数提放到原来的calldata中形成新的calldata
-    
 }
