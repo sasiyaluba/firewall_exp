@@ -7,6 +7,7 @@ use ethers::types::U256;
 use ethers::types::{Address, BlockId};
 use ethers_providers::{Middleware, Ws};
 use std::collections::HashMap;
+use z3::ast::Int;
 use z3::*;
 // 不变量结构
 pub struct Invariant {
@@ -133,14 +134,85 @@ impl RangeExpression {
             max: U256::from(0),
         }
     }
+
+    pub fn test_getRange(&self) -> Value_range {
+        //配置Z3上下文和求解器
+        let config = Config::new();
+        let ctx = Context::new(&config);
+        let solver = Solver::new(&ctx);
+
+        // 声明变量
+        let funds_amount = Int::new_const(&ctx, "fundsAmount");
+
+        // 初始余额和最小余额
+        let initial_balance = Int::from_i64(&ctx, 3);
+        let min_balance_after_withdrawal = Int::from_i64(&ctx, 1);
+
+        // 添加约束
+        solver.assert(&funds_amount.ge(&Int::from_i64(&ctx, 0)));
+        solver.assert(
+            &Int::sub(&ctx, &[&initial_balance, &funds_amount]).ge(&min_balance_after_withdrawal),
+        );
+
+        match solver.check() {
+            SatResult::Sat => {
+                let model = solver.get_model().expect("Unable to get model");
+
+                // 打印模型以调试
+                println!("{:?}", model.eval(&funds_amount, true));
+
+                // 获取 fundsAmount 的最大值
+                let max_value = solver
+                    .get_model()
+                    .expect("Unable to get model")
+                    .eval(
+                        &Int::sub(&ctx, &[&initial_balance, &min_balance_after_withdrawal]),
+                        true,
+                    )
+                    .expect("Evaluation failed")
+                    .as_i64()
+                    .expect("Conversion failed");
+                Value_range {
+                    min: U256::from(0),
+                    max: U256::from(max_value as u64),
+                }
+            }
+            SatResult::Unsat => {
+                println!("Unsat");
+                Value_range {
+                    min: U256::from(0),
+                    max: U256::from(0),
+                }
+            }
+            SatResult::Unknown => {
+                println!("Unknown");
+                Value_range {
+                    min: U256::from(0),
+                    max: U256::from(0),
+                }
+            }
+        }
+    }
 }
+
 
 #[test]
 fn test1() {
-    let expressions = vec![
-        "(declare-const x Int) (assert (> x 0))".to_string(),
-        "(declare-const x Int) (assert (> x 100))".to_string(),
-    ];
-    let mut exp = RangeExpression::new(expressions, "is alright".to_string());
-    exp.getRange();
+    // let expressions = vec![
+    //     "(declare-const x Int) (assert (> x 0))".to_string(),
+    //     "(declare-const x Int) (assert (> x 100))".to_string(),
+    // ];
+    // let mut exp = RangeExpression::new(expressions, "is alright".to_string());
+    // exp.getRange();
+
+    // get symbol execution params range.
+    let test_expression =
+        vec!["(declare-const fundsAmount Int) (assert (>= (- 3 fundsAmount) 1))".to_string()];
+    let mut exp1 = RangeExpression::new(test_expression, "is alright".to_string());
+    let mut result = exp1.test_getRange();
+    println!("In this case, our Value_range is :{:?}", result);
+
+    // 替换参数
+    // 参数位置，参数类型
+    
 }

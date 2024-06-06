@@ -13,6 +13,23 @@ pub struct Value_range {
     pub max: U256,
 }
 
+impl Value_range {
+    pub fn new(min: U256, max: U256) -> Self {
+        Self { min, max }
+    }
+    pub fn getRange(&self) -> Vec<U256> {
+        let mut Range = Vec::new();
+        let mut current = self.min;
+
+        while current <= self.max {
+            Range.push(current);
+            current = current + U256::one();
+        }
+
+        Range
+    }
+}
+
 pub struct registry {
     // 所有被保护的地址
     addresses: Vec<Address>,
