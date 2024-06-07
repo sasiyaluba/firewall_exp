@@ -1,32 +1,30 @@
+use crate::bytes::to_h256;
+use crate::core_module::context::account_state_ex_context::{
+    get_accounts_state_tx, get_tx_after_accounts_state, ISDiff,
+};
+use crate::core_module::context::evm_context::EvmContext;
+use crate::core_module::context::transaction_context::get_transaction_content;
+use crate::{EvmState, Runner};
+use dotenv::dotenv;
+use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash};
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
-use dotenv::dotenv;
-use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash};
-use crate::bytes::to_h256;
-use crate::core_module::context::account_state_ex_context::{get_accounts_state_tx, get_tx_after_accounts_state, ISDiff};
-use crate::core_module::context::transaction_context::get_transaction_content;
-use crate::{EvmState, Runner};
-use crate::core_module::context::evm_context::EvmContext;
 
-
-
-pub async fn get_evm_interpreter(rpc: &str, tx_hash: &'static str) -> Result<Runner, ProviderError> {
-
+pub async fn get_evm_interpreter(
+    rpc: &str,
+    tx_hash: &'static str,
+) -> Result<Runner, ProviderError> {
     // 1. set provider
-    let provider = Provider::try_connect(rpc)
-        .await
-        .expect("rpc connect error");
-
+    let provider = Provider::try_connect(rpc).await.expect("rpc connect error");
     // 2. Obtain the pre_transaction_account_state, 需要把这个状态改为post的状态
     let accounts_state_post_tx =
         get_tx_after_accounts_state(Arc::new(provider.clone()), to_h256(tx_hash)).await;
 
     // 3. Obtain the transaction context
-    let transaction_content =
-        get_transaction_content(provider, TxHash::from_str(tx_hash).unwrap())
-            .await
-            .expect("get transaction hash error");
+    let transaction_content = get_transaction_content(provider, TxHash::from_str(tx_hash).unwrap())
+        .await
+        .expect("get transaction hash error");
 
     let state: EvmState;
     state = EvmState::new(None);
@@ -47,7 +45,10 @@ pub async fn get_evm_interpreter(rpc: &str, tx_hash: &'static str) -> Result<Run
         Some(data),
         Some(state),
         None,
-        None
+        None,
+        None,
+        None,
+        None,
     );
 
     // 6. insert account_state to evm
@@ -70,7 +71,11 @@ pub async fn get_evm_interpreter(rpc: &str, tx_hash: &'static str) -> Result<Run
     evm_context.timestamp = transaction_content.timestamp;
 
     interpreter.evm_context = Some(evm_context);
-
+    interpreter.bytecode = interpreter
+        .state
+        .get_code_at(interpreter.address)
+        .unwrap()
+        .clone();
     // 9. 在更新上下文的时候，是否选择将拉取最新的交易上下文更新到要执行的模块中
     // todo! 拉取最新的区块链状态进行更新
     Ok(interpreter)

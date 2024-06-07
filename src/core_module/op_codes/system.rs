@@ -1,11 +1,15 @@
+use std::io::Write;
+
 use crate::core_module::runner::convert_array_to_hex;
 use crate::core_module::runner::Runner;
 use crate::core_module::utils::bytes;
 use crate::core_module::utils::bytes::{bytes32_to_address, pad_left};
+use crate::core_module::utils::debug::{to_hex_address, to_hex_string};
 use crate::core_module::utils::environment::{
     delete_account, get_balance, get_nonce, init_account,
 };
 use crate::core_module::utils::errors::ExecutionError;
+use ethers::types::Bytes;
 // Primitive types
 use ethers::types::U256;
 
@@ -175,6 +179,131 @@ pub fn call(runner: &mut Runner, bypass_static: bool) -> Result<(), ExecutionErr
     runner.increment_pc(1)
 }
 
+pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), ExecutionError> {
+    // 检查是否为staticcall
+    if runner.state.static_mode && !bypass_static {
+        return Err(ExecutionError::StaticCallStateChanged);
+    }
+
+    // Get the values on the stack
+    let gas = runner.stack.pop()?;
+    let to = runner.stack.pop()?;
+
+    // 得到value
+    let value = if bypass_static {
+        [0u8; 32]
+    } else {
+        runner.stack.pop()?
+    };
+
+    // 得到一系列offset以及size
+    let calldata_offset = U256::from_big_endian(&runner.stack.pop()?);
+    let calldata_size = U256::from_big_endian(&runner.stack.pop()?);
+    let returndata_offset = U256::from_big_endian(&runner.stack.pop()?);
+    let returndata_size = U256::from_big_endian(&runner.stack.pop()?);
+    let calldata1 = unsafe {
+        runner
+            .memory
+            .read(calldata_offset.as_usize(), calldata_size.as_usize())?
+    };
+    // 输出call指令的每个参数
+    println!("gas {:?}", gas);
+    println!("to {:?}", to);
+    println!("value {:?}", value);
+    println!("calldata_offset {:?}", calldata_offset);
+    println!("calldata_size {:?}", calldata_size);
+    println!("returndata_offset {:?}", returndata_offset);
+    println!("returndata_size {:?}", returndata_size);
+    println!("===========================================");
+    println!("替换前的calldata {:?}", calldata1);
+    // 进行检测，如果是指定的call，则更新calldata
+    if runner.exchange_flag == false {
+        match runner.target_address {
+            Some(address) => {
+                // 指定的to地址
+                println!("address {:?}", pad_left(address.as_slice()));
+                println!("to {:?}", to);
+                if pad_left(address.as_slice()).eq(to.as_slice()) {
+                    match runner.target_index {
+                        Some(index) => {
+                            println!("index");
+                            if index != 255 {
+                                // 根据index，计算对应的替换位置
+                                let index = index as usize;
+                                println!("新参数是 {:?}", runner.new_param.clone().unwrap());
+                                // 替换
+                                runner.memory.heap.splice(
+                                    calldata_offset.as_usize() + index * 32 + 4
+                                        ..calldata_offset.as_usize() + index * 32 + 36,
+                                    pad_left(runner.new_param.clone().unwrap().as_slice()),
+                                );
+                                let calldata2 = unsafe {
+                                    runner.memory.read(
+                                        calldata_offset.as_usize(),
+                                        calldata_size.as_usize(),
+                                    )?
+                                };
+                                println!("替换后的calldata {:?}", calldata2);
+                                runner.exchange_flag = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    // Load the input data from memory
+    let calldata = unsafe {
+        runner
+            .memory
+            .read(calldata_offset.as_usize(), calldata_size.as_usize())?
+    };
+
+    // Call the contract
+    let call_result = runner.call(
+        bytes32_to_address(&to),
+        value,
+        calldata,
+        U256::from_big_endian(&gas).as_u64(),
+        false,
+    );
+
+    if call_result.is_err() {
+        runner.stack.push(pad_left(&[0x00]))?;
+    } else {
+        runner.stack.push(pad_left(&[0x01]))?;
+    }
+
+    let mut return_data: Vec<u8> = runner.returndata.heap.clone();
+
+    // Complete return data with zeros if returndata is smaller than returndata_size
+    if return_data.len() < returndata_size.as_usize() {
+        return_data.extend(vec![0; returndata_size.as_usize() - return_data.len()]);
+    }
+    return_data = return_data[0..returndata_size.as_usize()].to_vec();
+
+    // Write the return data to memory
+    unsafe {
+        runner
+            .memory
+            .write(returndata_offset.as_usize(), return_data)?
+    };
+
+    // Transfer the value
+    if !value.eq(&[0u8; 32]) {
+        runner
+            .state
+            .transfer(runner.address, bytes32_to_address(&to), value)?;
+    }
+
+    // Increment PC
+    runner.increment_pc(1)
+}
+
 pub fn callcode(_: &mut Runner) -> Result<(), ExecutionError> {
     Err(ExecutionError::NotImplemented(0xF2))
 }
@@ -277,10 +406,14 @@ pub fn return_(runner: &mut Runner) -> Result<(), ExecutionError> {
 
 #[cfg(test)]
 mod tests {
+    use ethers::types::Address;
+
     use crate::core_module::runner::Runner;
     use crate::core_module::utils::bytes::{_hex_string_to_bytes, bytes32_to_address, pad_left};
     use crate::core_module::utils::environment::get_balance;
     use crate::core_module::utils::errors::ExecutionError;
+
+    use super::exchange_call;
 
     #[test]
     fn test_invalid() {

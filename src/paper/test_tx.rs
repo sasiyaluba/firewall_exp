@@ -87,6 +87,9 @@ async fn test_tx_state() -> Result<(), ProviderError> {
         Some(state),
         None,
         None,
+        None,
+        None,
+        None,
     );
 
     // 6. insert account_state to evm
@@ -289,61 +292,3 @@ fn test_one() {
     let call_ret = interpreter.call(contract_address2, [0; 32], inputdata, 0, false);
     assert_eq!(call_ret.unwrap(), ());
 }
-
-// #[test]
-// fn test_reentrancy() {
-//     // 合约部署者
-//     let deployer = TryInto::<[u8; 20]>::try_into(Address::random()).unwrap();
-//     let valut_balance: [u8; 32] = parse_ether("10")
-//         .unwrap()
-//         .to_be_bytes_vec()
-//         .try_into()
-//         .expect("transfer error");
-//     println!("{:?}", valut_balance);
-//     // 初始化evm
-//     let mut runner = Runner::new(
-//         deployer,
-//         Some(deployer),
-//         None,
-//         Some(valut_balance),
-//         None,
-//         Some(EvmState::new(None)),
-//         None,
-//     );
-
-//     // 字节码
-//     let valut_bytecode = hex::decode("6080604052610327806100136000396000f3fe6080604052600436106100345760003560e01c80633ccfd60b1461003957806370a0823114610050578063d0e30db01461008d575b600080fd5b34801561004557600080fd5b5061004e610097565b005b34801561005c57600080fd5b506100776004803603810190610072919061024a565b61018a565b6040516100849190610290565b60405180910390f35b6100956101a2565b005b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490503373ffffffffffffffffffffffffffffffffffffffff16816040516100fe906102dc565b60006040518083038185875af1925050503d806000811461013b576040519150601f19603f3d011682016040523d82523d6000602084013e610140565b606091505b50505060008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000208190555050565b60006020528060005260406000206000915090505481565b346000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002081905550565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000610217826101ec565b9050919050565b6102278161020c565b811461023257600080fd5b50565b6000813590506102448161021e565b92915050565b6000602082840312156102605761025f6101e7565b5b600061026e84828501610235565b91505092915050565b6000819050919050565b61028a81610277565b82525050565b60006020820190506102a56000830184610281565b92915050565b600081905092915050565b50565b60006102c66000836102ab565b91506102d1826102b6565b600082019050919050565b60006102e7826102b9565b915081905091905056fea26469706673582212200f547a969111f372811a11deef02a4096a2e0ba2c2e8795ab4840ee920f6efec64736f6c63430008130033").unwrap();
-//     // 部署合约
-//     let valut_address = runner.deploy_contract(valut_bytecode, vec![]).unwrap();
-//     println!("valut address {:?}", valut_address);
-//     println!("valut {:?}", runner.state.accounts.get(&valut_address));
-
-//     let hacker_bytecode = hex::decode("6080604052604051610318380380610318833981810160405281019061002591906100ce565b806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550506100fb565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061009b82610070565b9050919050565b6100ab81610090565b81146100b657600080fd5b50565b6000815190506100c8816100a2565b92915050565b6000602082840312156100e4576100e361006b565b5b60006100f2848285016100b9565b91505092915050565b61020e8061010a6000396000f3fe6080604052600436106100225760003560e01c80634de260a2146100b657610023565b5b6729a2241af62c00004710156100b45760008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16633ccfd60b6040518163ffffffff1660e01b8152600401600060405180830381600087803b15801561009b57600080fd5b505af11580156100af573d6000803e3d6000fd5b505050505b005b3480156100c257600080fd5b506100cb6100cd565b005b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663d0e30db0670de0b6b3a76400006040518263ffffffff1660e01b81526004016000604051808303818588803b15801561013d57600080fd5b505af1158015610151573d6000803e3d6000fd5b505050505060008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16633ccfd60b6040518163ffffffff1660e01b8152600401600060405180830381600087803b1580156101be57600080fd5b505af11580156101d2573d6000803e3d6000fd5b5050505056fea2646970667358221220bf38f216eba291adff1b00e83cc5ff4bc5071b2c92f8054082bdbb84fd836f6e64736f6c63430008130033").unwrap();
-//     // 参数
-//     let mut params = vec![];
-//     params.insert(0, pad_left(valut_address.as_slice()));
-//     let hacker_balance: [u8; 32] = parse_ether("1")
-//         .unwrap()
-//         .to_be_bytes_vec()
-//         .try_into()
-//         .expect("transfer error");
-//     runner.callvalue = hacker_balance;
-//     // 部署hacker
-//     let hacker_address = runner.deploy_contract(hacker_bytecode, params).unwrap();
-//     println!("hacker address {:?}", hacker_address);
-//     println!("hacker {:?}", runner.state.accounts.get(&hacker_address));
-
-//     // 执行交易
-//     runner.call(
-//         hacker_address,
-//         [0; 32],
-//         hex::decode("4de260a2").unwrap(),
-//         0,
-//         false,
-//     );
-//     println!("hacker {:?}", runner.state.accounts.get(&hacker_address));
-//     let mut call_data = hex::decode("70a08231").unwrap();
-//     let param = pad_left(hacker_address.as_slice()).to_vec();
-//     call_data.extend(param);
-//     runner.call(valut_address, [0; 32], call_data, 0, false);
-// }

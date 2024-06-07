@@ -15,6 +15,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::str::FromStr;
 
 // Colored output
 use crate::core_module::context::account_state_ex_context::AccountStateEx;
@@ -57,6 +58,13 @@ pub struct Runner {
 
     // constraint path
     pub constraint_path: Option<Vec<&'static str>>,
+
+    // exchange_flag
+    pub exchange_flag: bool,
+    pub target_index: Option<u8>,
+    pub target_address: Option<[u8; 20]>,
+    pub new_param: Option<Vec<u8>>,
+    pub pc_op_list: Vec<(usize, String)>,
 }
 pub fn convert_array_to_hex(array: &[u8]) -> String {
     array.iter().map(|x| format!("{:02x}", x)).collect()
@@ -120,6 +128,11 @@ impl Runner {
             calldata_info: None,
             op_list: vec![],
             constraint_path: None,
+            exchange_flag: false,
+            target_index: None,
+            target_address: None,
+            new_param: None,
+            pc_op_list: vec![],
         };
 
         // Return the instance
@@ -136,6 +149,9 @@ impl Runner {
         evm_context: Option<EvmContext>,
         // KEN: Compared to calldata, calldata_info includes newInputData and attack_contractAddress.
         calldata_info: Option<CallDataInfo>,
+        _target_address: Option<[u8; 20]>,
+        _target_index: Option<u8>,
+        _new_param: Option<Vec<u8>>,
     ) -> Self {
         let mut instance = Self {
             // Set the program counter to 0
@@ -185,6 +201,11 @@ impl Runner {
             calldata_info,
             op_list: vec![],
             constraint_path: None,
+            exchange_flag: false,
+            target_address: _target_address,
+            target_index: _target_index,
+            new_param: _new_param,
+            pc_op_list: vec![],
         };
         // Return the instance
         instance
@@ -250,7 +271,7 @@ impl Runner {
         } else {
             HashMap::default()
         };
-        println!("storage is : {:?}", storage);
+        // println!("storage is : {:?}", storage);
 
         let code_hash = if let Some(code_hash) = account_state_ex.code_hash.clone() {
             code_hash
@@ -318,7 +339,7 @@ impl Runner {
         }
 
         let mut error: Option<ExecutionError> = None;
-        // let mut file = OpenOptions::new().append(true).open("debug.txt").unwrap();
+        let mut file = OpenOptions::new().append(true).open("debug3.json").unwrap();
 
         // Interpret the bytecode
         while self.pc < self.bytecode.len() {
@@ -333,16 +354,13 @@ impl Runner {
 
             // Interpret an opcode
             let opcode = get_op_code(self.bytecode[self.pc]);
-            // if opcode.eq("CALL") {
-            //     writeln!(file, "caller {:?} callee {:?}", self.caller, self.address)
-            //         .expect("write error");
-            // }
+
             self.op_list.push(opcode);
-            println!("op {:?}", opcode);
-            if opcode.eq("RETURN") {
-                println!("here");
-            }
+
             let result = self.interpret_op_code(self.bytecode[self.pc]);
+
+            self.pc_op_list
+                .push((self.pc, String::from_str(&opcode).unwrap()));
 
             // debug
             // writeln!(file, "Op {} ", opcode).expect("write error");
@@ -353,9 +371,11 @@ impl Runner {
             for Item in &self.stack.stack {
                 s = s + &convert_array_to_hex(Item).as_str() + ",";
             }
-            println!("after op stack {:?}", s);
+            writeln!(file, "{:?} ", opcode).expect("write error");
+            writeln!(file, "{:?} ", s).expect("write error");
+
             let s1 = convert_array_to_hex(&self.memory.heap);
-            println!("after op memory {:?}", &s1);
+            // println!("after op memory {:?}", &s1);
             if result.is_err() {
                 error = Some(result.unwrap_err());
                 break;
@@ -444,6 +464,7 @@ impl Runner {
         self.set_pc(0);
         Ok(contract_address)
     }
+
     pub fn interpret_init(
         &mut self,
         bytecode: Vec<u8>,
@@ -517,7 +538,6 @@ impl Runner {
         match opcode {
             /* ---------------------------- Execution OpCodes --------------------------- */
             0x00 => op_codes::flow::stop(self),
-
             /* ------------------------- Math operations OpCodes ------------------------ */
             0x01 => op_codes::arithmetic::unsigned::add(self),
             0x02 => op_codes::arithmetic::unsigned::mul(self),
@@ -674,7 +694,7 @@ impl Runner {
 
             /* ----------------------------- System OpCodes ----------------------------- */
             0xf0 => op_codes::system::create(self),
-            0xf1 => op_codes::system::call(self, false),
+            0xf1 => op_codes::system::exchange_call(self, false),
             0xf2 => op_codes::system::callcode(self),
             0xf3 => op_codes::system::return_(self),
             0xf4 => op_codes::system::delegatecall(self),
@@ -789,6 +809,7 @@ impl Runner {
             None => Err(ExecutionError::ErrorSlot("slot is not init")),
         }
     }
+
     fn debug_stack(&self) {
         let border_line =
             "\n╔═══════════════════════════════════════════════════════════════════════════════════════════════════════╗";
