@@ -162,24 +162,3 @@ async fn get_call_data(
         .unwrap();
     println!("{:?}", calltrace);
 }
-
-#[tokio::test]
-async fn test11() {
-    let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
-    let tx_hash = "0xe915fc3045fa9922d402c3e9e62e0d7145a3a6a49400b3dad91c86d054e45561";
-    let address = "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD";
-    let function_selector = "0x3593564c";
-    let index = 0;
-    let path_strategy = PathStrategy::FullPathMatch;
-    let param_strategy = ParamStrategy::FullParamEnumeration;
-    let result = exec(
-        rpc,
-        tx_hash,
-        address,
-        function_selector,
-        index,
-        Some(path_strategy),
-        Some(param_strategy),
-    )
-    .await;
-}

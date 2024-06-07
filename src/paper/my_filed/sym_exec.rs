@@ -19,7 +19,9 @@ use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::paper::tx_origin_data::get_origin_oplist::{self, compare, get_pc_op};
+use crate::paper::tx_origin_data::get_origin_oplist::{
+    self, compare_list, get_opcode_list, get_opcode_list_str, get_pc_op,
+};
 
 pub async fn get_evm_interpreter(
     rpc: &str,
@@ -109,8 +111,9 @@ pub async fn sym_exec(
     _index: u8,
 ) -> Result<(), ExecutionError> {
     // 首先得到值范围
-    let _param_range = get_range_temp("", "", 0);
-    let origin_list = get_pc_op(_rpc, _tx_hash).await;
+    // let _param_range = get_range_temp("", "", 0);
+    let _param_range = vec![[0, 12].to_vec()];
+    let origin_list = get_opcode_list_str(_rpc, _tx_hash).await;
     println!("{:?}", _param_range);
     // 这里执行
     for new_param in _param_range {
@@ -121,11 +124,9 @@ pub async fn sym_exec(
         assert!(result.is_ok());
 
         // 10. 获取执行结果
-        let pc_op = runner.pc_op_list;
-
+        let _op_list = runner.op_list.clone();
+        compare_list(origin_list.clone(), _op_list);
         // 计算
-        let result = compare(origin_list.clone(), pc_op);
-        println!("{:?}", result);
     }
     Ok(())
 }

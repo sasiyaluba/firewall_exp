@@ -54,7 +54,7 @@ pub struct Runner {
     pub calldata_info: Option<CallDataInfo>,
 
     // op list
-    pub op_list: Vec<&'static str>,
+    pub op_list: Vec<String>,
 
     // constraint path
     pub constraint_path: Option<Vec<&'static str>>,
@@ -64,7 +64,6 @@ pub struct Runner {
     pub target_index: Option<u8>,
     pub target_address: Option<[u8; 20]>,
     pub new_param: Option<Vec<u8>>,
-    pub pc_op_list: Vec<(usize, String)>,
 }
 pub fn convert_array_to_hex(array: &[u8]) -> String {
     array.iter().map(|x| format!("{:02x}", x)).collect()
@@ -132,7 +131,6 @@ impl Runner {
             target_index: None,
             target_address: None,
             new_param: None,
-            pc_op_list: vec![],
         };
 
         // Return the instance
@@ -205,7 +203,6 @@ impl Runner {
             target_address: _target_address,
             target_index: _target_index,
             new_param: _new_param,
-            pc_op_list: vec![],
         };
         // Return the instance
         instance
@@ -355,12 +352,9 @@ impl Runner {
             // Interpret an opcode
             let opcode = get_op_code(self.bytecode[self.pc]);
 
-            self.op_list.push(opcode);
+            self.op_list.push(opcode.to_string());
 
             let result = self.interpret_op_code(self.bytecode[self.pc]);
-
-            self.pc_op_list
-                .push((self.pc, String::from_str(&opcode).unwrap()));
 
             // debug
             // writeln!(file, "Op {} ", opcode).expect("write error");
@@ -447,7 +441,7 @@ impl Runner {
             if opcode == "CALL" {
                 println!("here");
             }
-            self.op_list.push(opcode);
+            self.op_list.push(opcode.to_string());
             let result = self.interpret_op_code(self.bytecode[self.pc]);
             // debug
             writeln!(file, "Op {} ", opcode).expect("write error");
@@ -505,7 +499,8 @@ impl Runner {
             }
 
             // Interpret an opcode
-            self.op_list.push(get_op_code(self.bytecode[self.pc]));
+            self.op_list
+                .push(get_op_code(self.bytecode[self.pc]).to_string());
             // println!("self.op_list is :{:?}",self.op_list);
             let result = self.interpret_op_code(self.bytecode[self.pc]);
             if result.is_err() {
