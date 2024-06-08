@@ -144,7 +144,7 @@ pub async fn get_pc_op(_rpc: &str, _attack_hash: &str) -> Vec<(usize, String)> {
 }
 
 // 比较两个指令序列
-pub fn compare_list(_op_list1: Vec<String>, _op_list2: Vec<String>) -> bool {
+pub fn compare_list(_op_list1: Vec<String>, _op_list2: Vec<String>) -> f64 {
     let mut control_flow_op_list1: Vec<String> = Vec::new();
     let mut control_flow_op_list2: Vec<String> = Vec::new();
     // 提取两个指令序列的控制流指令，jumpi，jump，return，stop，revert，invalid，call，delegatecall，callcode，create，create2
@@ -190,11 +190,9 @@ pub fn compare_list(_op_list1: Vec<String>, _op_list2: Vec<String>) -> bool {
             same_count += 1;
         }
     }
-    println!(
-        "相似率 {:?}",
-        same_count as f64 / control_flow_op_list1.len() as f64
-    );
-    true
+    let simliarity = same_count as f64 / control_flow_op_list1.len() as f64;
+
+    simliarity
 }
 
 #[tokio::test]

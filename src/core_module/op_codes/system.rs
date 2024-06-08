@@ -207,21 +207,21 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
             .read(calldata_offset.as_usize(), calldata_size.as_usize())?
     };
     // 输出call指令的每个参数
-    println!("gas {:?}", gas);
-    println!("to {:?}", to);
-    println!("value {:?}", value);
-    println!("calldata_offset {:?}", calldata_offset);
-    println!("calldata_size {:?}", calldata_size);
-    println!("returndata_offset {:?}", returndata_offset);
-    println!("returndata_size {:?}", returndata_size);
+    // println!("gas {:?}", gas);
+    // println!("to {:?}", to);
+    // println!("value {:?}", value);
+    // println!("calldata_offset {:?}", calldata_offset);
+    // println!("calldata_size {:?}", calldata_size);
+    // println!("returndata_offset {:?}", returndata_offset);
+    // println!("returndata_size {:?}", returndata_size);
     println!("===========================================");
-    println!("替换前的calldata {:?}", calldata1);
+    // println!("替换前的calldata {:?}", calldata1);
     // 进行检测，如果是指定的call，则更新calldata
     if runner.exchange_flag == false {
         match runner.target_address {
             Some(address) => {
                 // 指定的to地址
-                println!("address {:?}", pad_left(address.as_slice()));
+                // println!("address {:?}", pad_left(address.as_slice()));
                 println!("to {:?}", to);
                 if pad_left(address.as_slice()).eq(to.as_slice()) {
                     match runner.target_index {
@@ -230,7 +230,7 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
                             if index != 255 {
                                 // 根据index，计算对应的替换位置
                                 let index = index as usize;
-                                println!("新参数是 {:?}", runner.new_param.clone().unwrap());
+                                // println!("新参数是 {:?}", runner.new_param.clone().unwrap());
                                 // 替换
                                 runner.memory.heap.splice(
                                     calldata_offset.as_usize() + index * 32 + 4
@@ -243,7 +243,7 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
                                         calldata_size.as_usize(),
                                     )?
                                 };
-                                println!("替换后的calldata {:?}", calldata2);
+                                // println!("替换后的calldata {:?}", calldata2);
                                 runner.exchange_flag = true;
                             }
                         }

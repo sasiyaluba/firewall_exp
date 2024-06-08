@@ -1,4 +1,17 @@
+use alloy_primitives::TxHash;
+use ethers::providers::{Http, Middleware, Provider, ProviderExt, StreamExt, Ws};
 use z3::*;
+
+#[tokio::test]
+pub async fn listen() {
+    let _rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
+    let _rpc = "wss://go.getblock.io/f9ed2c30f1784fb988948fdb0702bd2c";
+    // ws监听
+    let provider = Provider::<Ws>::connect(_rpc).await.unwrap();
+
+    // 订阅
+    let mut stream = provider.watch_blocks().await.unwrap().take(1);
+}
 
 pub fn test() {
     let config = z3::Config::new();
