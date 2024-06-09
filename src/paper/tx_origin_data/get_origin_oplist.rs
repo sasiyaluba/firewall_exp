@@ -1,8 +1,13 @@
+use ethers::middleware::gas_oracle::blocknative::Response;
+use ethers::prelude::TxHash;
+use ethers::types::{GethDebugBuiltInTracerConfig, GethTrace};
+use ethers::types::{GethDebugTracerConfig, GethDebugTracingOptions};
+use ethers_providers::{JsonRpcClient, JsonRpcClientWrapper, Middleware, Provider, Ws};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
-
+use std::str::FromStr;
 fn extract_op_values(logs: &Value) -> Vec<String> {
     let mut op_values = Vec::new();
 
@@ -79,7 +84,7 @@ pub async fn get_opcode_list(_rpc: &str, _attack_hash: &str) -> Vec<String> {
 // get_op_code_list ["PUSH1", "PUSH1", "MSTORE", "PUSH1", "CALLDATASIZE", "LT"]
 pub async fn get_opcode_list_str(_rpc: &str, _attack_hash: &str) -> Vec<String> {
     let client = Client::new();
-    let res = client
+    let res: reqwest::Response = client
         .post(_rpc)
         .json(&json!({
             "jsonrpc": "2.0",

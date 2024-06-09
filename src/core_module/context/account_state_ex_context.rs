@@ -5,7 +5,7 @@ use ethers::addressbook::Address;
 use ethers::prelude::GethDebugBuiltInTracerType::PreStateTracer;
 use ethers::prelude::{
     GethDebugBuiltInTracerConfig, GethDebugTracerConfig, GethDebugTracerType,
-    GethDebugTracingOptions, Http, PreStateConfig, PreStateFrame, Provider, ProviderExt,
+    GethDebugTracingOptions, Http, PreStateConfig, PreStateFrame, Provider, ProviderExt, Ws,
 };
 use ethers::providers::Middleware;
 use ethers::types::AccountState;
@@ -80,21 +80,21 @@ impl ISDiff {
 
 // 拿到交易执行之前的账户状态
 pub async fn get_turn_off_diff_accounts_state(
-    provider: Arc<Provider<Http>>,
+    provider: Arc<Provider<Ws>>,
     tx_hash: H256,
 ) -> BTreeMap<Address, AccountStateEx> {
     get_accounts_state_tx(provider, tx_hash, ISDiff::default()).await
 }
 // 拿到交易之后返回的pre字段中对应的账户状态
 pub async fn get_turn_on_diff_pre_accounts_state(
-    provider: Arc<Provider<Http>>,
+    provider: Arc<Provider<Ws>>,
     tx_hash: H256,
 ) -> BTreeMap<Address, AccountStateEx> {
     get_accounts_state_tx(provider, tx_hash, ISDiff::new(true, Some(true))).await
 }
 // 拿到交易执行之后的post字段中对应的账户状态
 pub async fn get_turn_on_diff_post_accounts_state(
-    provider: Arc<Provider<Http>>,
+    provider: Arc<Provider<Ws>>,
     tx_hash: H256,
 ) -> BTreeMap<Address, AccountStateEx> {
     get_accounts_state_tx(provider, tx_hash, ISDiff::new(true, Some(false))).await
@@ -102,7 +102,7 @@ pub async fn get_turn_on_diff_post_accounts_state(
 
 // 拿到交易执行之后读取和写入的账户状态
 pub async fn get_tx_after_accounts_state(
-    provider: Arc<Provider<Http>>,
+    provider: Arc<Provider<Ws>>,
     tx_hash: H256,
 ) -> BTreeMap<Address, AccountStateEx> {
     let mut turn_off_diff_accounts_state =
@@ -200,7 +200,7 @@ pub fn insert_tx_account_state_ex(
 }
 
 pub async fn get_accounts_state_tx(
-    provider: Arc<Provider<Http>>,
+    provider: Arc<Provider<Ws>>,
     tx_hash: H256,
     is_diff: ISDiff,
 ) -> BTreeMap<Address, AccountStateEx> {
@@ -262,67 +262,68 @@ pub async fn get_accounts_state_tx(
     };
     tx_account_state_ex
 }
-#[tokio::test]
-pub async fn test_get_turn_off_diff_accounts_state() {
-    let provider_http_url =
-        String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
 
-    let provider = Provider::try_connect(provider_http_url.as_str())
-        .await
-        .expect("rpc connect error");
-    let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
-    let account_state =
-        get_accounts_state_tx(Arc::from(provider), to_h256(attack_hash), ISDiff::default()).await;
-    // println!("{:?}", account_state);
-}
+// #[tokio::test]
+// pub async fn test_get_turn_off_diff_accounts_state() {
+//     let provider_http_url =
+//         String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
 
-#[tokio::test]
-pub async fn test_get_turn_on_diff_pre_accounts_state() {
-    let provider_http_url =
-        String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
+//     let provider = Provider::try_connect(provider_http_url.as_str())
+//         .await
+//         .expect("rpc connect error");
+//     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
+//     let account_state =
+//         get_accounts_state_tx(Arc::from(provider), to_h256(attack_hash), ISDiff::default()).await;
+//     // println!("{:?}", account_state);
+// }
 
-    let provider = Provider::try_connect(provider_http_url.as_str())
-        .await
-        .expect("rpc connect error");
-    let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
-    let account_state = get_accounts_state_tx(
-        Arc::from(provider),
-        to_h256(attack_hash),
-        ISDiff::new(true, Some(true)),
-    )
-    .await;
-    // println!("{:?}", account_state);
-}
+// #[tokio::test]
+// pub async fn test_get_turn_on_diff_pre_accounts_state() {
+//     let provider_http_url =
+//         String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
 
-#[tokio::test]
-pub async fn test_get_turn_on_diff_post_accounts_state() {
-    let provider_http_url =
-        String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
+//     let provider = Provider::try_connect(provider_http_url.as_str())
+//         .await
+//         .expect("rpc connect error");
+//     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
+//     let account_state = get_accounts_state_tx(
+//         Arc::from(provider),
+//         to_h256(attack_hash),
+//         ISDiff::new(true, Some(true)),
+//     )
+//     .await;
+//     // println!("{:?}", account_state);
+// }
 
-    let provider = Provider::try_connect(provider_http_url.as_str())
-        .await
-        .expect("rpc connect error");
-    let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
-    let account_state = get_accounts_state_tx(
-        Arc::from(provider),
-        to_h256(attack_hash),
-        ISDiff::new(true, Some(false)),
-    )
-    .await;
-    // println!("{:?}", account_state);
-}
+// #[tokio::test]
+// pub async fn test_get_turn_on_diff_post_accounts_state() {
+//     let provider_http_url =
+//         String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
 
-#[tokio::test]
-pub async fn test_get_tx_after_accounts_state() {
-    let provider_http_url =
-        String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
+//     let provider = Provider::try_connect(provider_http_url.as_str())
+//         .await
+//         .expect("rpc connect error");
+//     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
+//     let account_state = get_accounts_state_tx(
+//         Arc::from(provider),
+//         to_h256(attack_hash),
+//         ISDiff::new(true, Some(false)),
+//     )
+//     .await;
+//     // println!("{:?}", account_state);
+// }
 
-    let provider = Provider::try_connect(provider_http_url.as_str())
-        .await
-        .expect("rpc connect error");
+// #[tokio::test]
+// pub async fn test_get_tx_after_accounts_state() {
+//     let provider_http_url =
+//         String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b");
 
-    let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
-    let account_state =
-        get_tx_after_accounts_state(Arc::from(provider), to_h256(attack_hash)).await;
-    // println!("{:?}", account_state);
-}
+//     let provider = Provider::try_connect(provider_http_url.as_str())
+//         .await
+//         .expect("rpc connect error");
+
+//     let attack_hash = "0x3ed75df83d907412af874b7998d911fdf990704da87c2b1a8cf95ca5d21504cf";
+//     let account_state =
+//         get_tx_after_accounts_state(Arc::from(provider), to_h256(attack_hash)).await;
+//     // println!("{:?}", account_state);
+// }

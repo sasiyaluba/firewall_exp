@@ -15,7 +15,6 @@ pub async fn listening_storage(
     block: Option<BlockId>,
     exp: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let http_rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     // 连接到以太坊节点
     let provider = Provider::<Ws>::connect(&rpc).await?;
     let provider = Arc::new(provider);
@@ -53,7 +52,7 @@ pub async fn listening_storage(
             for tx in interact_tx {
                 println!("interact tx hash: {:?}", tx.hash.encode_hex());
                 // 符号执行
-                let kill_range = sym_exec(&http_rpc, &tx.hash.encode_hex()[2..], &from, 0)
+                let kill_range = sym_exec(&rpc, &tx.hash.encode_hex()[2..], &from, 0)
                     .await
                     .unwrap();
                 // todo! 最终需要将kill_range中的范围添加到防护模块中

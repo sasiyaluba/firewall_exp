@@ -13,7 +13,7 @@ use alloy_primitives::utils::parse_ether;
 use alloy_rlp::Bytes;
 use dotenv::dotenv;
 use ethers::prelude::Provider;
-use ethers::providers::{Middleware, ProviderError, ProviderExt};
+use ethers::providers::{Middleware, ProviderError, ProviderExt, Ws};
 use ethers::types::Opcode::SHA3;
 use ethers::types::{Address, TxHash};
 use ethers::utils::keccak256;
@@ -43,7 +43,7 @@ async fn test_tx_state() -> Result<(), ProviderError> {
         String::from("https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b")
     });
 
-    let provider = Provider::try_connect(provider_http_url.as_str())
+    let provider = Provider::<Ws>::connect(provider_http_url.as_str())
         .await
         .expect("rpc connect error");
 

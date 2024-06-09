@@ -6,7 +6,7 @@ use crate::core_module::context::evm_context::EvmContext;
 use crate::core_module::context::transaction_context::get_transaction_content;
 use crate::{EvmState, Runner};
 use dotenv::dotenv;
-use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash};
+use ethers::prelude::{Provider, ProviderError, ProviderExt, TxHash, Ws};
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -16,7 +16,9 @@ pub async fn get_evm_interpreter(
     tx_hash: &'static str,
 ) -> Result<Runner, ProviderError> {
     // 1. set provider
-    let provider = Provider::try_connect(rpc).await.expect("rpc connect error");
+    let provider = Provider::<Ws>::connect(rpc)
+        .await
+        .expect("rpc connect error");
     // 2. Obtain the pre_transaction_account_state, 需要把这个状态改为post的状态
     let accounts_state_post_tx =
         get_tx_after_accounts_state(Arc::new(provider.clone()), to_h256(tx_hash)).await;

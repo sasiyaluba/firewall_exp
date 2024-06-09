@@ -1,11 +1,10 @@
-
-use alloy_primitives::B256;
-use ethers::prelude::{Http, Provider, TxHash};
-use primitive_types::{H256, U256};
-pub use serde::Serialize;
 use crate::core_module::memory::Memory;
 use crate::core_module::utils::bytes::pad_left;
-use ethers::providers::{Middleware, ProviderError, ProviderExt};
+use alloy_primitives::B256;
+use ethers::prelude::{Http, Provider, TxHash};
+use ethers::providers::{Middleware, ProviderError, ProviderExt, Ws};
+use primitive_types::{H256, U256};
+pub use serde::Serialize;
 
 #[derive(Debug, Clone)]
 pub struct TransactionEnv {
@@ -54,13 +53,11 @@ pub enum StateTracerType {
     TurnOffDiff,
     TurnOnDiffPre,
     TurnOnDiffPost,
-    TXAfterState
+    TXAfterState,
 }
 
-
-
 pub async fn get_transaction_content(
-    provider: Provider<Http>,
+    provider: Provider<Ws>,
     tx_hash: TxHash,
 ) -> Result<TransactionEnv, ProviderError> {
     let transaction = provider
@@ -160,6 +157,3 @@ pub async fn get_transaction_content(
         chain_id: transaction.clone().unwrap().chain_id,
     })
 }
-
-
-

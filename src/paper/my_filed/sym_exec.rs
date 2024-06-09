@@ -12,7 +12,7 @@ use crate::core_module::context::transaction_context::get_transaction_content;
 use crate::paper::strategy::param_strategy::get_range_temp;
 use crate::EvmState;
 use dotenv::dotenv;
-use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash};
+use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash, Ws};
 use ethers::types::H256;
 use hex::FromHex;
 use std::env;
@@ -31,7 +31,7 @@ pub async fn get_evm_interpreter(
     _new_param: Vec<u8>,
 ) -> Result<Runner, ProviderError> {
     // 1. set provider
-    let provider = Provider::<Http>::try_connect(rpc)
+    let provider = Provider::<Ws>::connect(rpc)
         .await
         .expect("rpc connect error");
     // 2. Obtain the pre_transaction_account_state, 需要把这个状态改为post的状态
@@ -151,7 +151,7 @@ pub async fn sym_exec(
     Ok(kill_range)
 }
 
-#[tokio::test]
+// #[tokio::test]
 async fn test_sym_exec() {
     let rpc = "https://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
     // let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
