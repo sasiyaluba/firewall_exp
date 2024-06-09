@@ -60,18 +60,19 @@ pub async fn get_evm_interpreter(
     let value = transaction_content.value;
     let mut _simulate = false;
 
-    let data =
-        if address.eq(&<[u8; 20]>::from_hex(&_target_address).unwrap()) && _target_index != 255 {
-            // 直接在此处更换参数
-            transaction_content.calldata.heap.splice(
-                4 + _target_index as usize * 32..36 + _target_index as usize * 32,
-                pad_left(_new_param.clone().as_slice()),
-            );
-            _simulate = true;
-            transaction_content.calldata.heap
-        } else {
-            transaction_content.calldata.heap
-        };
+    let data = if address.eq(&<[u8; 20]>::from_hex(&_target_address[2..]).unwrap())
+        && _target_index != 255
+    {
+        // 直接在此处更换参数
+        transaction_content.calldata.heap.splice(
+            4 + _target_index as usize * 32..36 + _target_index as usize * 32,
+            pad_left(_new_param.clone().as_slice()),
+        );
+        _simulate = true;
+        transaction_content.calldata.heap
+    } else {
+        transaction_content.calldata.heap
+    };
     println!("data {:?}", &data);
     // 5. Create a new interpreter
     let mut interpreter = Runner::new_paper(
@@ -83,7 +84,7 @@ pub async fn get_evm_interpreter(
         Some(state),
         None,
         None,
-        Some(<[u8; 20]>::from_hex(_target_address).expect("invaild address")),
+        Some(<[u8; 20]>::from_hex(&_target_address[2..]).expect("invaild address")),
         Some(_target_index),
         Some(_new_param),
     );
@@ -123,7 +124,7 @@ pub async fn get_evm_interpreter(
 pub async fn sym_exec(
     _rpc: &str,
     _tx_hash: &str,
-    _target_address: &'static str,
+    _target_address: &str,
     _index: u8,
 ) -> Result<Vec<Vec<u8>>, ExecutionError> {
     let mut kill_range: Vec<Vec<u8>> = vec![];
