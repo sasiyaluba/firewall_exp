@@ -206,14 +206,7 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
             .memory
             .read(calldata_offset.as_usize(), calldata_size.as_usize())?
     };
-    // 输出call指令的每个参数
-    // println!("gas {:?}", gas);
-    // println!("to {:?}", to);
-    // println!("value {:?}", value);
-    // println!("calldata_offset {:?}", calldata_offset);
-    // println!("calldata_size {:?}", calldata_size);
-    // println!("returndata_offset {:?}", returndata_offset);
-    // println!("returndata_size {:?}", returndata_size);
+
     println!("===========================================");
     // println!("替换前的calldata {:?}", calldata1);
     // 进行检测，如果是指定的call，则更新calldata

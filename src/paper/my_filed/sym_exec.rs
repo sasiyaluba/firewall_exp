@@ -10,18 +10,20 @@ use crate::core_module::context::account_state_ex_context::{
 use crate::core_module::context::evm_context::EvmContext;
 use crate::core_module::context::transaction_context::get_transaction_content;
 use crate::paper::strategy::param_strategy::get_range_temp;
-use crate::EvmState;
-use dotenv::dotenv;
-use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash, Ws};
-use ethers::types::H256;
-use hex::FromHex;
-use std::env;
-use std::str::FromStr;
-use std::sync::Arc;
-
 use crate::paper::tx_origin_data::get_origin_oplist::{
     self, compare_list, get_opcode_list, get_opcode_list_str, get_pc_op,
 };
+use crate::EvmState;
+use dotenv::dotenv;
+use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash, Ws};
+use ethers::signers::LocalWallet;
+use ethers::types::{Bytes, Transaction, TransactionRequest, H256};
+use ethers_providers::Middleware;
+use hex::FromHex;
+use primitive_types::H160;
+use std::env;
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub async fn get_evm_interpreter(
     rpc: &str,
@@ -45,10 +47,9 @@ pub async fn get_evm_interpreter(
     //     get_tx_after_accounts_state(Arc::new(provider.clone()), to_h256(tx_hash)).await;
 
     // 3. Obtain the transaction context
-    let mut transaction_content =
-        get_transaction_content(provider, TxHash::from_str(tx_hash).unwrap())
-            .await
-            .expect("get transaction hash error");
+    let transaction_content = get_transaction_content(provider, TxHash::from_str(tx_hash).unwrap())
+        .await
+        .expect("get transaction hash error");
 
     let state: EvmState;
     state = EvmState::new(None);
@@ -64,16 +65,17 @@ pub async fn get_evm_interpreter(
         && _target_index != 255
     {
         // 直接在此处更换参数
-        transaction_content.calldata.heap.splice(
-            4 + _target_index as usize * 32..36 + _target_index as usize * 32,
-            pad_left(_new_param.clone().as_slice()),
-        );
+        let start = 4 + _target_index as usize * 32;
+        let end = start + 32;
+        let mut calldata = transaction_content.calldata.heap.clone();
+        calldata.splice(start..end, pad_left(_new_param.clone().as_slice()));
         _simulate = true;
-        transaction_content.calldata.heap
+        println!("calldata {:?}", &calldata);
+        calldata
     } else {
         transaction_content.calldata.heap
     };
-    println!("data {:?}", &data);
+
     // 5. Create a new interpreter
     let mut interpreter = Runner::new_paper(
         caller,
@@ -130,30 +132,36 @@ pub async fn sym_exec(
     let mut kill_range: Vec<Vec<u8>> = vec![];
     // todo! 需要得到值的范围
     // ?下面只是假设。。。
-    let _param_range = vec![[0, 12].to_vec()];
-    let origin_list = get_opcode_list_str(_rpc, _tx_hash).await;
-    // 这里执行
+    let _param_range: Vec<Vec<u8>> = (0..=100).map(|x| vec![x as u8]).collect();
+    let mut runner = get_evm_interpreter(_rpc, _tx_hash, _target_address, 255, vec![0])
+        .await
+        .unwrap();
+    let _ = runner.interpret(runner.bytecode.clone(), false);
+    let origin_address_pc_op = runner.address_pc_op.clone();
+    // 替换执行
     for new_param in _param_range {
         let mut runner =
             get_evm_interpreter(_rpc, _tx_hash, _target_address, _index, new_param.clone())
                 .await
                 .unwrap();
         let _ = runner.interpret(runner.bytecode.clone(), false);
-
+        let new_address_pc_op = runner.address_pc_op.clone();
         // 计算与原始的相似度
-        let _op_list = runner.op_list.clone();
-        let result = compare_list(origin_list.clone(), _op_list);
+        let result: f64 = compare_list(origin_address_pc_op.clone(), new_address_pc_op.clone());
+        println!("相似率 {:?}", result);
         // todo!相似率大于多少，就添加到kill_range中
-        if result > 0.9 {
+        if result > 0.95 {
             kill_range.push(new_param.clone());
         }
     }
+    println!("kill_range {:?}", kill_range);
     Ok(kill_range)
 }
 
-// #[tokio::test]
+#[tokio::test]
 async fn test_sym_exec() {
-    let rpc = "https://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
+    let rpc = "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6";
+    let rpc =  "wss://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
     // let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
     let tx_hash = "0x0d51c6fbc9182bf90bcb1f24323bf18aebcce02521023789ce8e58a23a2c6ada";
     let target_address = "9e3b917755889b27266d5483e001754e1be4fc5c";

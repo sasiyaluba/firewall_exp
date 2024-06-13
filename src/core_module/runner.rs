@@ -55,7 +55,10 @@ pub struct Runner {
 
     // op list
     pub op_list: Vec<String>,
-
+    // pc_op list
+    pub pc_op_list: Vec<(usize, String)>,
+    // address_pc_op list
+    pub address_pc_op: Vec<([u8; 20], usize, String)>,
     // constraint path
     pub constraint_path: Option<Vec<&'static str>>,
 
@@ -123,6 +126,8 @@ impl Runner {
             // Set the call depth to 0
             call_depth: 0,
             evm_context: evm_context,
+            pc_op_list: vec![],
+            address_pc_op: vec![],
             op_count: 0,
             calldata_info: None,
             op_list: vec![],
@@ -198,6 +203,8 @@ impl Runner {
             op_count: 0,
             calldata_info,
             op_list: vec![],
+            pc_op_list: vec![],
+            address_pc_op: vec![],
             constraint_path: None,
             exchange_flag: false,
             target_address: _target_address,
@@ -336,7 +343,7 @@ impl Runner {
         }
 
         let mut error: Option<ExecutionError> = None;
-        let mut file = OpenOptions::new().append(true).open("debug3.json").unwrap();
+        // let mut file = OpenOptions::new().append(true).open("debug3.json").unwrap();
 
         // Interpret the bytecode
         while self.pc < self.bytecode.len() {
@@ -351,9 +358,11 @@ impl Runner {
 
             // Interpret an opcode
             let opcode = get_op_code(self.bytecode[self.pc]);
-
+            // println!("opcode is : {:?}", opcode);
             self.op_list.push(opcode.to_string());
-
+            self.pc_op_list.push((self.pc, opcode.to_string()));
+            self.address_pc_op
+                .push((self.address, self.pc, opcode.to_string()));
             let result = self.interpret_op_code(self.bytecode[self.pc]);
 
             // debug
@@ -361,14 +370,14 @@ impl Runner {
             // writeln!(file, "Stack {:?} ", self.stack).expect("write error");
             // writeln!(file, "Memory {:?} ", self.memory).expect("write error");
             // writeln!(file, "Op {} ", opcode).expect("write error");
-            let mut s = String::new();
-            for Item in &self.stack.stack {
-                s = s + &convert_array_to_hex(Item).as_str() + ",";
-            }
-            writeln!(file, "{:?} ", opcode).expect("write error");
-            writeln!(file, "{:?} ", s).expect("write error");
+            // let mut s = String::new();
+            // for Item in &self.stack.stack {
+            //     s = s + &convert_array_to_hex(Item).as_str() + ",";
+            // }
+            // writeln!(file, "{:?} ", opcode).expect("write error");
+            // writeln!(file, "{:?} ", s).expect("write error");
 
-            let s1 = convert_array_to_hex(&self.memory.heap);
+            // let s1 = convert_array_to_hex(&self.memory.heap);
             // println!("after op memory {:?}", &s1);
             if result.is_err() {
                 error = Some(result.unwrap_err());

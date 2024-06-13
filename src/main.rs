@@ -1,19 +1,20 @@
 mod core_module;
-use core_module::state::EvmState;
 use core_module::utils::errors::ExecutionError;
-use ethers::types::H256;
-use evm_rs_emulator::paper::my_filed::minitor::listening_storage;
-use std::{env, fs, str::FromStr};
+use std::str::FromStr;
 // Colored output
 use colored::*;
+use evm_rs_emulator::paper::my_filed::sym_exec::sym_exec;
+use evm_rs_emulator::paper::my_filed::Handler::Handler;
 
 #[tokio::main]
-async fn main() -> Result<(), ExecutionError> {
-    let rpc = "wss://wiser-stylish-isle.quiknode.pro/fe971117365d555490242e38972893351f3bcd6a/";
-    let from = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-    let location = vec![H256::from_low_u64_be(0)];
-    println!("Before calling listening_storage");
-    let _ = listening_storage(rpc, from, location, None, String::from_str("").unwrap()).await;
-    println!("After calling listening_storage");
-    Ok(())
+async fn main() {
+    let mut handler = Handler::new(
+        "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6",
+        "mysql://root:1234@172.29.199.74:3306/invariantregistry",
+        vec![String::from_str("0x70ccd19d14552da0fb0712fd3920aeb1f9f65f59").unwrap()],
+    )
+    .await
+    .unwrap();
+
+    handler.handle().await;
 }

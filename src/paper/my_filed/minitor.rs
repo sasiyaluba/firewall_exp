@@ -35,7 +35,7 @@ pub async fn listening_storage(
         }
         println!("values: {:?}", values);
         // 计算表达式的值
-        let result = caculate_expression_value(exp.clone(), values.clone());
+        let result = true;
         if result {
             // 得到当前与项目合约交互的交易hash
             let now_block = provider
@@ -60,12 +60,6 @@ pub async fn listening_storage(
         }
     }
     Ok(())
-}
-
-// todo!表达式的解析，计算
-pub fn caculate_expression_value(exp: String, values: Vec<H256>) -> bool {
-    // 计算表达式的值
-    true
 }
 
 #[tokio::test]

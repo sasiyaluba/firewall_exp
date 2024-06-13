@@ -8,6 +8,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str::FromStr;
+
+use crate::paper::strategy::simiarity;
 fn extract_op_values(logs: &Value) -> Vec<String> {
     let mut op_values = Vec::new();
 
@@ -83,6 +85,7 @@ pub async fn get_opcode_list(_rpc: &str, _attack_hash: &str) -> Vec<String> {
 
 // get_op_code_list ["PUSH1", "PUSH1", "MSTORE", "PUSH1", "CALLDATASIZE", "LT"]
 pub async fn get_opcode_list_str(_rpc: &str, _attack_hash: &str) -> Vec<String> {
+    let _rpc = "https://go.getblock.io/6969c2c44a9f4e3893299c50da1d1364";
     let client = Client::new();
     let res: reqwest::Response = client
         .post(_rpc)
@@ -104,8 +107,7 @@ pub async fn get_opcode_list_str(_rpc: &str, _attack_hash: &str) -> Vec<String> 
         .await
         .expect("rpc error");
     let tracer_data = res.json::<Value>().await.expect("json lib error");
-
-    let mut opcode_list: Vec<String> = Vec::new();
+    let opcode_list: Vec<String> = Vec::new();
     if tracer_data["result"]["failed"].eq(&true) {
         return opcode_list;
     }
@@ -148,63 +150,41 @@ pub async fn get_pc_op(_rpc: &str, _attack_hash: &str) -> Vec<(usize, String)> {
     extract_pc_op(&struct_logs)
 }
 
-// 比较两个指令序列
-pub fn compare_list(_op_list1: Vec<String>, _op_list2: Vec<String>) -> f64 {
-    let mut control_flow_op_list1: Vec<String> = Vec::new();
-    let mut control_flow_op_list2: Vec<String> = Vec::new();
-    // 提取两个指令序列的控制流指令，jumpi，jump，return，stop，revert，invalid，call，delegatecall，callcode，create，create2
-    for op in _op_list1 {
-        if op.eq("JUMPI")
-            || op.eq("JUMP")
-            || op.eq("RETURN")
-            || op.eq("STOP")
-            || op.eq("REVERT")
-            || op.eq("INVALID")
-            || op.eq("CALL")
-            || op.eq("DELEGATECALL")
-            || op.eq("CALLCODE")
-            || op.eq("CREATE")
-            || op.eq("CREATE2")
-        {
+pub fn compare_list(
+    _op_list1: Vec<([u8; 20], usize, String)>,
+    _op_list2: Vec<([u8; 20], usize, String)>,
+) -> f64 {
+    let mut control_flow_op_list1: Vec<([u8; 20], usize, String)> = Vec::new();
+    let mut control_flow_op_list2: Vec<([u8; 20], usize, String)> = Vec::new();
+
+    for op in _op_list1.clone() {
+        if op.2.as_str().eq("JUMPDEST") {
             control_flow_op_list1.push(op);
         }
     }
 
-    for op in _op_list2 {
-        if op.eq("JUMPI")
-            || op.eq("JUMP")
-            || op.eq("RETURN")
-            || op.eq("STOP")
-            || op.eq("REVERT")
-            || op.eq("INVALID")
-            || op.eq("CALL")
-            || op.eq("DELEGATECALL")
-            || op.eq("CALLCODE")
-            || op.eq("CREATE")
-            || op.eq("CREATE2")
-        {
+    for op in _op_list2.clone() {
+        if op.2.as_str().eq("JUMPDEST") {
             control_flow_op_list2.push(op);
         }
     }
 
-    // 进行逐条比较，记录相似率
     let mut same_count = 0;
+    let max_len = std::cmp::max(control_flow_op_list1.len(), control_flow_op_list2.len());
 
-    for i in 0..control_flow_op_list1.len() {
-        if control_flow_op_list2.len() > i && control_flow_op_list1[i] == control_flow_op_list2[i] {
-            same_count += 1;
+    for i in 0..max_len {
+        if control_flow_op_list1.len() > i && control_flow_op_list2.len() > i {
+            if control_flow_op_list1[i] == control_flow_op_list2[i] {
+                same_count += 1;
+            }
         }
     }
-    let simliarity = same_count as f64 / control_flow_op_list1.len() as f64;
 
-    simliarity
+    let simiarity = same_count as f64 / control_flow_op_list1.len() as f64;
+    simiarity
 }
-
 #[tokio::test]
-async fn test_get_opcode_list() {
-    let rpc = "https://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
-    let attack_hash = "0x0d51c6fbc9182bf90bcb1f24323bf18aebcce02521023789ce8e58a23a2c6ada";
-
-    let op_list = get_pc_op(rpc, attack_hash).await;
-    println!("{:?}", op_list);
+async fn test_get() {
+    let tx_hash = "0xb9be87b2a62070b0a645e342f73742a17abd9c152c4b3f297bf753d1b768f9c0";
+    get_opcode_list_str("", &tx_hash).await;
 }

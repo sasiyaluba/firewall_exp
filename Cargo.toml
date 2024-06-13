@@ -8,6 +8,7 @@ description = "A blazingly fast in-memory Ethereum Virtual Machine (EVM) emulato
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
 #[macro_use]
 #extern crate dotenv_codegen;
 
@@ -31,3 +32,7 @@ z3 = "0.12.1"
 ethers-providers = { version = "2.0.7", features = ["ws"] }
 mysql = "*"
 chrono = "0.4"
+regex = "1.10.5"
+num-bigint = "0.4"
+num-traits = "0.2"
+ansi_term = "0.12"
