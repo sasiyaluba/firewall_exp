@@ -1,4 +1,4 @@
-use crate::paper::my_filed::expression::evaluate_exp;
+use crate::paper::my_filed::expression::{evaluate_exp, evaluate_exp_with_unknown};
 use crate::paper::my_filed::sym_exec::sym_exec;
 use ansi_term::Colour::{Black, Blue, Cyan, Fixed, Green, Purple, Red, White, Yellow};
 use ethers::abi::AbiEncode;
@@ -51,7 +51,7 @@ impl Handler {
         &self,
         _address: &str,
         _function_selector: &str,
-    ) -> Result<Vec<Vec<u8>>, Box<dyn std::error::Error>> {
+    ) -> Result<(u128, u128, u8), Box<dyn std::error::Error>> {
         let mut connect = self.sql_connect.get_conn()?;
         let address_id: i32 = connect
             .exec_first(
@@ -61,17 +61,27 @@ impl Handler {
                 },
             )?
             .ok_or("Address not found")?;
-
+        println!("address id {:?}", address_id);
         let expression:String = connect
             .exec_first(
-                "SELECT expression FROM function_expressions WHERE address_id =:address_id AND function_selector:=function_selector",
+                "SELECT expression FROM function_expressions WHERE address_id =:address_id AND function_selector =:function_selector",
                 params! {
-                    "address_id" => address_id,
+                    "address_id" => address_id.to_string(),
                     "function_selector" => _function_selector
                 },
             )?
             .ok_or("Address not found")?;
-        Ok(vec![])
+        let index:u8 = connect
+        .exec_first(
+            "SELECT param_index FROM function_expressions WHERE address_id =:address_id AND function_selector =:function_selector",
+            params! {
+                "address_id" => address_id.to_string(),
+                "function_selector" => _function_selector
+            },
+        )?
+        .ok_or("Address not found")?;
+        let (min, max) = self.caculate_range(_address, expression).await;
+        Ok((min, max, index))
     }
 
     // 检查不变量是否异常
@@ -238,11 +248,18 @@ impl Handler {
                 //todo 这里做符号执行，放到其他线程去做...
                 if interact_tx.len() > 0 {
                     println!("interact tx hash: {:?}", interact_tx[0].hash.encode_hex());
+                    let selector = get_selector(&interact_tx[0].input[..4]);
+                    println!("selector {:?}", selector);
+                    // todo index的获得
+                    let (min, max, index) =
+                        self.get_range(address, selector.as_str()).await.unwrap();
                     let _ = sym_exec(
                         &self.rpc,
                         interact_tx[0].hash.encode_hex().as_str(),
                         &address,
-                        0,
+                        index,
+                        min,
+                        max,
                     )
                     .await;
                 }
@@ -251,11 +268,8 @@ impl Handler {
         Ok(())
     }
 
-    pub async fn caculate_range(&self, _address: &str, _expression: String) -> bool {
-        // 将表达式分割，以&&为分隔符
+    pub async fn caculate_range(&self, _address: &str, _expression: String) -> (u128, u128) {
         let _expression = _expression.replace(" ", "");
-        let _expressions: Vec<&str> = _expression.split("&&").collect();
-        let mut result = true;
         // 首先获得所有状态变量的名称
         let mut connect = self.sql_connect.get_conn().unwrap();
         let address_id: i32 = connect
@@ -269,56 +283,69 @@ impl Handler {
             .unwrap();
         let variable_names: Vec<String> = connect
             .exec(
-                "SELECT variable_name FROM variablestoslot WHERE address_id =:address_id",
+                "SELECT variable_name FROM variabletoslot WHERE address_id =:address_id",
                 params! {
                     "address_id" => address_id,
                 },
             )
             .unwrap();
         println!("variable_names {:?}", variable_names);
-        // 分别处理每个表达式
-        for _expression in _expressions {
-            // 获得所有变量
-            let re = Regex::new(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b").unwrap();
-            let mut variables: Vec<String> = re
-                .find_iter(_expression.as_bytes())
-                .map(|mat| String::from_utf8(mat.as_bytes().to_vec()).unwrap())
-                .collect();
+        // 获得所有变量
+        let re = Regex::new(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b").unwrap();
+        let variables: Vec<String> = re
+            .find_iter(_expression.as_bytes())
+            .map(|mat| String::from_utf8(mat.as_bytes().to_vec()).unwrap())
+            .collect();
 
-            // 只包含状态变量的变量集
-            let mut filtered_variables: Vec<String> = Vec::new();
-            for var in variables.iter() {
-                if variable_names.contains(var) {
-                    filtered_variables.push(var.clone());
-                }
+        // 只包含状态变量的变量集
+        let mut state_variables: Vec<String> = Vec::new();
+        for var in variables.iter() {
+            if variable_names.contains(var) {
+                state_variables.push(var.clone());
             }
-
-            // 获得所有变量的值
-            let mut _values = self
-                .get_values_with_names(_address, filtered_variables.clone())
-                .await
-                .unwrap();
-            // 将原表达式中的每个变量替换为对应的值
-            let mut new_expression = _expression.to_string();
-            for i in 0..variables.len() {
-                new_expression =
-                    new_expression.replace(variables[i].as_str(), _values[i].to_string().as_str());
-            }
-            // println!("替换后，表达式为：{:?}", new_expression);
-            // 计算表达式的值
-            result = result && evaluate_exp(new_expression.as_str()).unwrap();
         }
-        result
+
+        // 获得所有状态变量的值
+        let _values = self
+            .get_values_with_names(_address, state_variables.clone())
+            .await
+            .unwrap();
+
+        // 将原表达式中的每个状态变量替换为对应的值，因此得到一个包含未知数和常数的表达式
+        let mut new_expression: String = _expression.to_string();
+        for i in 0.._values.len() {
+            new_expression = new_expression
+                .replace(state_variables[i].as_str(), _values[i].to_string().as_str());
+        }
+
+        println!("替换后，表达式为：{:?}", new_expression);
+        let (min, max) = evaluate_exp_with_unknown(&new_expression).unwrap();
+        (min, max)
     }
 }
 
 #[tokio::test]
-async fn test_all() {
+async fn test_caculate_range() {
     let mut handler = Handler::new(
-        "wss://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/",
+        "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6",
         "mysql://root:1234@172.29.199.74:3306/invariantregistry",
         vec![String::from_str("0x433ba3f2322F6449582f60d36fa64C4EB8830fCC").unwrap()],
     )
     .await
     .unwrap();
+    let result = handler
+        .caculate_range(
+            "0x70ccd19d14552da0fb0712fd3920aeb1f9f65f59",
+            String::from_str("param0  < reserveB && param0 < reserveA").unwrap(),
+        )
+        .await;
+}
+
+fn get_selector(bytes: &[u8]) -> String {
+    // 将字节数组转换为十六进制字符串（小写）
+    let hex_string: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // 加上 '0x' 前缀
+    let hex_with_prefix = format!("0x{}", hex_string);
+    hex_with_prefix
 }

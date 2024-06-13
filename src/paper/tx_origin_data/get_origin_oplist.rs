@@ -162,7 +162,6 @@ pub fn compare_list(
             control_flow_op_list1.push(op);
         }
     }
-
     for op in _op_list2.clone() {
         if op.2.as_str().eq("JUMPDEST") {
             control_flow_op_list2.push(op);

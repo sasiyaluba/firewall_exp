@@ -128,11 +128,14 @@ pub async fn sym_exec(
     _tx_hash: &str,
     _target_address: &str,
     _index: u8,
+    _min_value: u128,
+    _max_value: u128,
 ) -> Result<Vec<Vec<u8>>, ExecutionError> {
     let mut kill_range: Vec<Vec<u8>> = vec![];
     // todo! 需要得到值的范围
     // ?下面只是假设。。。
-    let _param_range: Vec<Vec<u8>> = (0..=100).map(|x| vec![x as u8]).collect();
+
+    let _param_range: Vec<Vec<u8>> = (_min_value..=_max_value).map(|x| vec![x as u8]).collect();
     let mut runner = get_evm_interpreter(_rpc, _tx_hash, _target_address, 255, vec![0])
         .await
         .unwrap();
@@ -156,15 +159,4 @@ pub async fn sym_exec(
     }
     println!("kill_range {:?}", kill_range);
     Ok(kill_range)
-}
-
-#[tokio::test]
-async fn test_sym_exec() {
-    let rpc = "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6";
-    let rpc =  "wss://chaotic-sly-panorama.ethereum-sepolia.quiknode.pro/b0ed5f4773268b080eaa3143de06767fcc935b8d/";
-    // let rpc = "https://lb.nodies.app/v1/181a5ebf4c954f8496ae7cbc1ac8d03b";
-    let tx_hash = "0x0d51c6fbc9182bf90bcb1f24323bf18aebcce02521023789ce8e58a23a2c6ada";
-    let target_address = "9e3b917755889b27266d5483e001754e1be4fc5c";
-    let target_index = 0;
-    let _ = sym_exec(&rpc, &tx_hash, &target_address, target_index).await;
 }
