@@ -12,9 +12,15 @@ async fn main() {
     let handler = Handler::new(
         "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6",
         "mysql://root:1234@172.29.199.74:3306/invariantregistry",
-        vec![String::from_str("0x70ccd19d14552da0fb0712fd3920aeb1f9f65f59").unwrap()],
+        vec![String::from_str("0x4b00a35Eb8CAe62337f37FE561d7fF48987a4FED").unwrap()],
     )
     .await
     .unwrap();
     handler.handle().await;
 }
+
+/*
+1.可扩展的数据结构，解决参数离散值的问题，不只是上限和下限
+2.
+
+*/

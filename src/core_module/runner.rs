@@ -760,7 +760,7 @@ impl Runner {
 
         // Get the return data
         let return_data = self.returndata.heap.clone();
-        println!("return data{:?}:", return_data);
+        // println!("return data{:?}:", return_data);
         // Restore the initial runner state
         if !delegate {
             self.caller = initial_caller;

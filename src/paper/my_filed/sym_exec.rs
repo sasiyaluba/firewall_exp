@@ -9,22 +9,24 @@ use crate::core_module::context::account_state_ex_context::{
 };
 use crate::core_module::context::evm_context::EvmContext;
 use crate::core_module::context::transaction_context::get_transaction_content;
+use crate::paper::my_filed::expression::find_max_min;
 use crate::paper::strategy::param_strategy::get_range_temp;
 use crate::paper::tx_origin_data::get_origin_oplist::{
     self, compare_list, get_opcode_list, get_opcode_list_str, get_pc_op,
 };
 use crate::EvmState;
+use ansi_term::Colour::Red;
 use dotenv::dotenv;
 use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash, Ws};
 use ethers::signers::LocalWallet;
 use ethers::types::{Bytes, Transaction, TransactionRequest, H256};
 use ethers_providers::Middleware;
 use hex::FromHex;
+use num_traits::ToBytes;
 use primitive_types::H160;
 use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
-
 pub async fn get_evm_interpreter(
     rpc: &str,
     tx_hash: &str,
@@ -70,7 +72,7 @@ pub async fn get_evm_interpreter(
         let mut calldata = transaction_content.calldata.heap.clone();
         calldata.splice(start..end, pad_left(_new_param.clone().as_slice()));
         _simulate = true;
-        println!("calldata {:?}", &calldata);
+        // println!("calldata {:?}", &calldata);
         calldata
     } else {
         transaction_content.calldata.heap
@@ -130,12 +132,11 @@ pub async fn sym_exec(
     _index: u8,
     _min_value: u128,
     _max_value: u128,
-) -> Result<Vec<Vec<u8>>, ExecutionError> {
-    let mut kill_range: Vec<Vec<u8>> = vec![];
-    // todo! 需要得到值的范围
-    // ?下面只是假设。。。
-
-    let _param_range: Vec<Vec<u8>> = (_min_value..=_max_value).map(|x| vec![x as u8]).collect();
+) -> Result<Vec<u128>, ExecutionError> {
+    // 参数范围
+    let mut kill_range: Vec<u128> = vec![];
+    // 得到的参数范围
+    let _param_range: Vec<u128> = (_min_value..=_max_value).collect();
     let mut runner = get_evm_interpreter(_rpc, _tx_hash, _target_address, 255, vec![0])
         .await
         .unwrap();
@@ -143,16 +144,20 @@ pub async fn sym_exec(
     let origin_address_pc_op = runner.address_pc_op.clone();
     // 替换执行
     for new_param in _param_range {
-        let mut runner =
-            get_evm_interpreter(_rpc, _tx_hash, _target_address, _index, new_param.clone())
-                .await
-                .unwrap();
+        let mut runner = get_evm_interpreter(
+            _rpc,
+            _tx_hash,
+            _target_address,
+            _index,
+            new_param.clone().to_be_bytes().to_vec(),
+        )
+        .await
+        .unwrap();
         let _ = runner.interpret(runner.bytecode.clone(), false);
         let new_address_pc_op = runner.address_pc_op.clone();
         // 计算与原始的相似度
         let result: f64 = compare_list(origin_address_pc_op.clone(), new_address_pc_op.clone());
-        println!("相似率 {:?}", result);
-        // todo!相似率大于多少，就添加到kill_range中
+        println!("参数值为 {:?} 与原攻击相似率为 {:?}", new_param, result);
         if result > 0.95 {
             kill_range.push(new_param.clone());
         }

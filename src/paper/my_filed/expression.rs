@@ -140,7 +140,7 @@ pub fn evaluate_exp_with_unknown(_expression: &str) -> Result<(u128, u128), Expr
 
     // 遍历每个表达式，为求解器分别加上约束
     for _exp in _expressions {
-        println!("now expression {:?}", _exp);
+        // println!("now expression {:?}", _exp);
         // 得到中缀表达式
         let re = Regex::new(r"([a-zA-Z_][a-zA-Z0-9_]*|[0-9]+|[+\-*/()<>!=]+)").unwrap();
         let infix: Vec<String> = re
@@ -151,7 +151,7 @@ pub fn evaluate_exp_with_unknown(_expression: &str) -> Result<(u128, u128), Expr
         let y = infix_to_postfix(infix);
         // 计算后缀表达式，为求解器加上约束
         evaluate_postfix_with_unknown(&solver, y.clone(), x.clone());
-        println!("now constraint {:?}", &solver.get_assertions());
+        // println!("now constraint {:?}", &solver.get_assertions());
     }
     // 求解
     let mut _new_param: Vec<u128> = vec![];
@@ -298,9 +298,4 @@ pub fn find_max_min(array: &[u128]) -> Option<(u128, u128)> {
     }
 
     Some((max_value, min_value))
-}
-#[test]
-fn test1() {
-    let expression = "param0+10<20";
-    let result = evaluate_exp_with_unknown(expression);
 }

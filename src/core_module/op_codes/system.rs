@@ -207,7 +207,6 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
             .read(calldata_offset.as_usize(), calldata_size.as_usize())?
     };
 
-    println!("===========================================");
     // println!("替换前的calldata {:?}", calldata1);
     // 进行检测，如果是指定的call，则更新calldata
     if runner.exchange_flag == false {
@@ -215,7 +214,6 @@ pub fn exchange_call(runner: &mut Runner, bypass_static: bool) -> Result<(), Exe
             Some(address) => {
                 // 指定的to地址
                 // println!("address {:?}", pad_left(address.as_slice()));
-                println!("to {:?}", to);
                 if pad_left(address.as_slice()).eq(to.as_slice()) {
                     match runner.target_index {
                         Some(index) => {
