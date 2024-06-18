@@ -1,5 +1,5 @@
-use std::fmt;
 use super::utils::errors::ExecutionError;
+use std::fmt;
 
 /// A stack data structure used in the Ethereum Virtual Machine (EVM) to store and manipulate data.
 #[derive(Debug)]
@@ -132,7 +132,10 @@ impl fmt::Display for Stack {
             writeln!(
                 f,
                 "{}",
-                item.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
+                item.iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<Vec<String>>()
+                    .join(" ")
             )?;
         }
         Ok(())

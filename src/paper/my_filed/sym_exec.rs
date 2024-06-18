@@ -142,6 +142,8 @@ pub async fn sym_exec(
         .unwrap();
     let _ = runner.interpret(runner.bytecode.clone(), false);
     let origin_address_pc_op = runner.address_pc_op.clone();
+    let temp_state = runner.state;
+    println!("{:?}", temp_state);
     // 替换执行
     for new_param in _param_range {
         let mut runner = get_evm_interpreter(
@@ -164,4 +166,17 @@ pub async fn sym_exec(
     }
     println!("kill_range {:?}", kill_range);
     Ok(kill_range)
+}
+
+#[tokio::test]
+async fn test_sym_exec() {
+    sym_exec(
+        "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6",
+        "0xac2f7fd46450921f0638dbc1f1b4bbf6de477341ff1b503ae801608d640e096f",
+        "0xBe9566f1bc9a6a18ad1ed5620Ccb76ff639534d5",
+        0,
+        1,
+        9,
+    )
+    .await;
 }
