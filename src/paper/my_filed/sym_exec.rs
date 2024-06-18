@@ -167,16 +167,3 @@ pub async fn sym_exec(
     println!("kill_range {:?}", kill_range);
     Ok(kill_range)
 }
-
-#[tokio::test]
-async fn test_sym_exec() {
-    sym_exec(
-        "wss://go.getblock.io/4f364318713f46aba8d5b6de9b7e3ae6",
-        "0xac2f7fd46450921f0638dbc1f1b4bbf6de477341ff1b503ae801608d640e096f",
-        "0xBe9566f1bc9a6a18ad1ed5620Ccb76ff639534d5",
-        0,
-        1,
-        9,
-    )
-    .await;
-}
