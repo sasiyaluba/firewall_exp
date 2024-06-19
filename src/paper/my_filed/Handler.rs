@@ -98,7 +98,6 @@ impl Handler {
                 .collect();
             // variables 去重
             let unique_vec: Vec<String> = vec_remove_duplicates(&mut variables);
-            println!("unique_vec {:?}", unique_vec);
             let mut slot_map: HashMap<i32, HashMap<String, String>> = HashMap::new();
             // slot_map
             for name in unique_vec.iter() {
@@ -159,7 +158,7 @@ impl Handler {
                 index_map,
                 function_expressions,
             );
-            protect_info_cache.print_all();
+            // protect_info_cache.print_all();
             self.protect_infos
                 .insert(_address.clone(), protect_info_cache);
         }
@@ -228,18 +227,13 @@ impl Handler {
         _address: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         // 获得表达式
-        let expression = self.get_expression(_address);
+        let protect_info = self.protect_infos.get(_address).unwrap();
+        let expression = protect_info.invariant_expression.clone();
         println!("-----------当前不变量 {}", Blue.paint(&expression.clone()));
         println!();
         // 处理表达式
-        let result = self.handle_exp2(_address, expression).await;
+        let result = self.handle_exp(_address, expression).await;
         Ok(result)
-    }
-
-    // 获取表达式
-    pub fn get_expression(&self, _address: &str) -> String {
-        let protect_info = self.protect_infos.get(_address).unwrap();
-        protect_info.invariant_expression.clone()
     }
 
     // 根据变量名获取值
@@ -275,41 +269,8 @@ impl Handler {
         Ok(values)
     }
 
-    // 处理表达式（不变量表达式）
+    // 表达式处理
     pub async fn handle_exp(&self, _address: &str, _expression: String) -> bool {
-        // 将表达式分割，以&&为分隔符
-        let _expression = _expression.replace(" ", "");
-        let _expressions: Vec<&str> = _expression.split("&&").collect();
-        let mut result = true;
-        // 分别处理每个表达式
-        for _expression in _expressions {
-            // 获得所有变量
-            let re = Regex::new(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b").unwrap();
-            let variables: Vec<String> = re
-                .find_iter(_expression.as_bytes())
-                .map(|mat| String::from_utf8(mat.as_bytes().to_vec()).unwrap())
-                .collect();
-            // 获得所有变量的值
-            let mut _values = self
-                .get_values_with_names(_address, variables.clone())
-                .await
-                .unwrap();
-            // println!("表达式 {:?}", _expression);
-            // 将原表达式中的每个变量替换为对应的值
-            let mut new_expression = _expression.to_string();
-            for i in 0..variables.len() {
-                new_expression = new_expression.replace(
-                    variables[i].as_str(),
-                    _values.get(&variables[i]).unwrap().to_string().as_str(),
-                );
-            }
-            // println!("替换后，表达式为：{:?}", new_expression);
-            // 计算表达式的值
-            result = result && parse_expression(new_expression.as_str());
-        }
-        result
-    }
-    pub async fn handle_exp2(&self, _address: &str, _expression: String) -> bool {
         // 将表达式分割，以&&为分隔符
         let _expression = _expression.replace(" ", "");
         let mut result = true;
@@ -340,6 +301,7 @@ impl Handler {
         }
         result
     }
+
     // 主要函数，入口
     pub async fn handle(self: &Arc<Self>) -> Result<(), Box<dyn std::error::Error>> {
         // 进行监听
@@ -347,100 +309,104 @@ impl Handler {
         // 监听区块
         while let Some(block) = block_stream.next().await {
             println!(
-                "-----当前区块为 {}",
+                "-----当前区块为 {} ",
                 Yellow.paint(&block.number.unwrap().to_string())
             );
             // 记录不变量检测的开始时间
-            let start = std::time::Instant::now();
             for address in self.protect_addresses.iter() {
+                let _block = block.clone();
+                let start = std::time::Instant::now();
                 let check_result = self.check_invariant(address.as_str()).await?;
-                if !check_result {
+                let end = std::time::Instant::now();
+                println!(
+                    "检查不变量的时间为：{}",
+                    Yellow.paint(&format!("{:?}", end - start))
+                );
+                if check_result {
+                    println!("{}", Green.paint("Invariant is safe!"));
+                    println!();
+                } else {
                     // todo 接下来的一系列动作
+                    println!("{}", Red.paint("Invariant is broken!"));
+                    println!();
+                    // 创建一个共享引用
+                    let self_clone: Arc<Handler> = Arc::clone(self);
+                    tokio::spawn(async move {
+                        println!("check thread: {:?})", thread::current().id());
+                        self_clone.protect_thread(_block).await.unwrap();
+                    });
                 }
             }
-            let end = std::time::Instant::now();
-            println!(
-                "检查不变量的时间为：{}",
-                Yellow.paint(&format!("{:?}", end - start))
-            );
-            // 创建一个共享引用
-            let self_clone: Arc<Handler> = Arc::clone(self);
-            tokio::spawn(async move {
-                println!("check thread: {:?})", thread::current().id());
-                self_clone.block_check(block).await.unwrap();
-            });
         }
         Ok(())
     }
 
     // 区块检查
-    pub async fn block_check(
+    pub async fn protect_thread(
         &self,
-        _now_block: Block<H256>,
+        _now_block: Block<TxHash>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let start = std::time::Instant::now();
+
         for address in self.protect_addresses.iter() {
-            let result = self.check_invariant(address.as_str()).await?;
-            if !result {
-                println!("{}", Red.paint("Invariant is broken!"));
-                println!();
-
-                // todo 进行过滤，找到与from交互的交易
-                let now_block = self
-                    .rpc_connect
-                    .get_block_with_txs(_now_block.number.unwrap())
-                    .await
-                    .expect("can't get block")
-                    .unwrap();
-                let all_tx: Vec<Transaction> = now_block.transactions;
-                let interact_tx: Vec<Transaction> = all_tx
-                    .into_iter()
-                    .filter(|tx| tx.to == Some(H160::from_str(address).unwrap()))
-                    .collect();
-
-                //todo 这里做符号执行，放到其他线程去做...
-                if interact_tx.len() > 0 {
-                    println!(
-                        "interact tx hash: {}",
-                        Red.paint(interact_tx[0].hash.encode_hex())
-                    );
-                    let selector = get_selector(&interact_tx[0].input[..4]);
-                    println!("attacked selector：{} ", Red.paint(selector.as_str()));
-                    let (min, max, index) = self.get_range(address, selector).await.unwrap();
-                    let kill_range = sym_exec(
-                        &self.rpc,
-                        interact_tx[0].hash.encode_hex().as_str(),
-                        &address,
-                        index,
-                        min,
-                        max,
+            // todo 进行过滤，找到与from交互的交易
+            let now_block = self
+                .rpc_connect
+                .get_block_with_txs(_now_block.number.unwrap())
+                .await
+                .expect("can't get block")
+                .unwrap();
+            let all_tx: Vec<Transaction> = now_block.transactions;
+            let interact_tx: Vec<Transaction> = all_tx
+                .into_iter()
+                .filter(|tx| tx.to == Some(H160::from_str(address).unwrap()))
+                .collect();
+            //todo 这里做符号执行，放到其他线程去做...
+            if interact_tx.len() > 0 {
+                println!(
+                    "interact tx hash: {}",
+                    Red.paint(interact_tx[0].hash.encode_hex())
+                );
+                let selector = get_selector(&interact_tx[0].input[..4]);
+                println!("attacked selector：{} ", Red.paint(selector.as_str()));
+                let (min, max, index) = self.get_range(address, selector).await.unwrap();
+                let kill_range = sym_exec(
+                    &self.rpc,
+                    interact_tx[0].hash.encode_hex().as_str(),
+                    &address,
+                    index,
+                    min,
+                    max,
+                )
+                .await
+                .unwrap();
+                // 得到最值
+                let (max, min) = find_max_min(&kill_range).unwrap();
+                let origin_data = "d133576a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001046be12c000000000000000000000000008eaD3c2F184Bf64CDAa428653A17E287aa3addb5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a029e99f07000000000000000000000000000000000000000000000000000000000000000000000000000000004b00a35eb8cae62337f37fe561d7ff48987a4fed00000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222222222222200000000000000000000000000000000000000000000000000000000";
+                let _new_data = origin_data.replace(
+                    "1111111111111111111111111111111111111111111111111111111111111111",
+                    remove_0x_prefix(min.encode_hex().as_str()),
+                );
+                let new_data = _new_data.replace(
+                    "2222222222222222222222222222222222222222222222222222222222222222",
+                    remove_0x_prefix(max.encode_hex().as_str()),
+                );
+                // todo发送交易到合约
+                let _ = self
+                    .send_tx(
+                        "ba457ad011e6f8b3efc7f2b51d3fa7db94c26903f58b6d5da8176d5fbbc7f2e4",
+                        "0xdBE9D9fcD06Ab1C82815eEcb9E4b78fD805c84A7",
+                        Bytes::from_str(new_data.as_str()).unwrap(),
                     )
-                    .await
-                    .unwrap();
-                    // 得到最值
-                    let (max, min) = find_max_min(&kill_range).unwrap();
-                    let origin_data = "d133576a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001046be12c000000000000000000000000008eaD3c2F184Bf64CDAa428653A17E287aa3addb5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a029e99f07000000000000000000000000000000000000000000000000000000000000000000000000000000004b00a35eb8cae62337f37fe561d7ff48987a4fed00000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222222222222200000000000000000000000000000000000000000000000000000000";
-                    let _new_data = origin_data.replace(
-                        "1111111111111111111111111111111111111111111111111111111111111111",
-                        remove_0x_prefix(min.encode_hex().as_str()),
-                    );
-                    let new_data = _new_data.replace(
-                        "2222222222222222222222222222222222222222222222222222222222222222",
-                        remove_0x_prefix(max.encode_hex().as_str()),
-                    );
-                    // todo发送交易到合约
-                    let _ = self
-                        .send_tx(
-                            "ba457ad011e6f8b3efc7f2b51d3fa7db94c26903f58b6d5da8176d5fbbc7f2e4",
-                            "0xdBE9D9fcD06Ab1C82815eEcb9E4b78fD805c84A7",
-                            Bytes::from_str(new_data.as_str()).unwrap(),
-                        )
-                        .await;
-                }
-            } else {
-                println!("{}", Green.paint("Invariant is safe!"));
-                println!();
+                    .await;
             }
+            let end = std::time::Instant::now();
+            println!(
+                "protectThread花费的时间 {}",
+                Yellow.paint(&format!("{:?}", end - start))
+            );
         }
+
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 use alloy_primitives::B256;
 use primitive_types::U256;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EvmContext {
     pub blockhash: Option<[u8; 32]>,
 

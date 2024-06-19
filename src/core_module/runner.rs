@@ -814,6 +814,9 @@ impl Runner {
         }
     }
 
+    pub fn set_state(&mut self, _new_state: EvmState) {
+        self.state = _new_state;
+    }
     fn debug_stack(&self) {
         let border_line =
             "\n╔═══════════════════════════════════════════════════════════════════════════════════════════════════════╗";

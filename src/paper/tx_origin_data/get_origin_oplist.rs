@@ -183,7 +183,7 @@ pub fn compare_list(
     simiarity
 }
 
-#[tokio::test]
+// #[tokio::test]
 async fn test_get() {
     let tx_hash = "0xb9be87b2a62070b0a645e342f73742a17abd9c152c4b3f297bf753d1b768f9c0";
     get_opcode_list_str("", &tx_hash).await;
