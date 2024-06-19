@@ -1,5 +1,6 @@
 use crate::bytes::pad_left;
 use crate::debug::to_hex_string;
+use crate::op_codes::arithmetic::unsigned::add;
 use crate::paper::my_filed::expression::{evaluate_exp, evaluate_exp_with_unknown, find_max_min};
 use crate::paper::my_filed::parser;
 use crate::paper::my_filed::parser::parse_expression;
@@ -13,7 +14,9 @@ use ethers::types::{Block, Transaction};
 use mysql::prelude::Queryable;
 use mysql::*;
 use num_traits::ToBytes;
+use rayon::vec;
 use regex::bytes::Regex;
+use serde_json::to_string;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
@@ -21,6 +24,7 @@ use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+
 #[derive(Debug)]
 pub struct Handler {
     rpc: &'static str,
@@ -41,17 +45,17 @@ pub struct ProtectInfoCache {
     // 不变量表达式涉及的变量名
     state_variables: Vec<String>,
     // 不变量表达式涉及的slot，address => variable => slot
-    slots: HashMap<i32, HashMap<String, String>>,
+    slot_map: HashMap<i32, HashMap<String, String>>,
     // 保护的函数选择器列表
     selectors: Vec<String>,
     // 函数选择器 => index
-    function_selectors: HashMap<String, u8>,
+    index_map: HashMap<String, u8>,
     // index => expression
     function_expressions: HashMap<u8, String>,
 }
 
 impl Handler {
-    pub fn insert_data_for_address(
+    pub fn database_cache_init(
         &mut self,
         _addresses: Vec<String>,
         _selectors: Vec<String>,
@@ -60,9 +64,6 @@ impl Handler {
         let mut connect = self.sql_connect.get_conn().unwrap();
 
         for _address in _addresses.into_iter() {
-            let mut protect_info_cache = ProtectInfoCache::new();
-
-            // 插入address以及address_id
             let address_id: i32 = connect
                 .exec_first(
                     "SELECT id FROM addresses WHERE address =:address",
@@ -71,10 +72,8 @@ impl Handler {
                     },
                 )?
                 .ok_or("Address not found")?;
-            protect_info_cache.insert_address(_address.clone(), address_id);
 
-            // 插入不变量以及expression_id
-            let expression: String = connect
+            let invar_expression: String = connect
                 .exec_first(
                     "SELECT expression FROM expressions WHERE address_id =:address_id",
                     params! {
@@ -82,8 +81,7 @@ impl Handler {
                     },
                 )?
                 .ok_or("Address not found")?;
-            // expression_id
-            let expression_id: i32 = connect
+            let invar_expression_id: i32 = connect
                 .exec_first(
                     "SELECT id FROM expressions WHERE address_id =:address_id",
                     params! {
@@ -91,39 +89,45 @@ impl Handler {
                     },
                 )?
                 .ok_or("Address not found")?;
-            protect_info_cache.insert_invariant_expression(expression.clone(), expression_id);
 
             // 插入相关变量名
             let re = Regex::new(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b").unwrap();
             let mut variables: Vec<String> = re
-                .find_iter(expression.as_bytes())
+                .find_iter(invar_expression.as_bytes())
                 .map(|mat| String::from_utf8(mat.as_bytes().to_vec()).unwrap())
                 .collect();
             // variables 去重
             let unique_vec: Vec<String> = vec_remove_duplicates(&mut variables);
-            protect_info_cache.insert_more_state_variables(unique_vec.clone());
-            // slots
-            for name in unique_vec.into_iter() {
+            println!("unique_vec {:?}", unique_vec);
+            let mut slot_map: HashMap<i32, HashMap<String, String>> = HashMap::new();
+            // slot_map
+            for name in unique_vec.iter() {
+                let mut temp_map = HashMap::new();
                 if name.eq("address(this).balance") {
-                    protect_info_cache.insert_slot(
-                        address_id,
-                        "address(this).balance".to_string(),
-                        "address(this).balance".to_string(),
-                    );
-                    continue;
-                }
-                let _slot: String = connect
+                    temp_map.insert(name.to_string(), name.to_string());
+                } else {
+                    let _slot: String = connect
                     .exec_first(
                         "SELECT slot FROM variables WHERE variable_name = :variable_name AND expression_id = :expression_id",
                         params! {
                             "variable_name" => name.as_str(),
-                            "expression_id" => expression_id.to_string()
+                            "expression_id" => invar_expression_id.to_string()
                         },
                     )?
                     .ok_or("Variable name not found")?;
-                protect_info_cache.insert_slot(address_id, name, _slot);
+                    temp_map.insert(name.to_string(), _slot);
+                }
+                // 如果已存在，先获得entry
+                if slot_map.contains_key(&address_id) {
+                    let mut _map = slot_map.get_mut(&address_id).unwrap();
+                    _map.insert(name.to_string(), temp_map.get(name).unwrap().to_string());
+                } else {
+                    slot_map.insert(address_id, temp_map);
+                }
             }
 
+            let mut index_map = HashMap::new();
+            let mut function_expressions = HashMap::new();
             //selectors
             for selector in _selectors.iter() {
                 let index:u8 = connect.exec_first(
@@ -132,6 +136,7 @@ impl Handler {
                         "address_id" => address_id.to_string(),
                         "function_selector" => selector.as_str()
                     },)?.ok_or("Address not found or funcSelector not found")?;
+                index_map.insert(selector.to_string(), index);
                 let param_expression:String = connect
                     .exec_first(
                         "SELECT expression FROM function_expressions WHERE address_id =:address_id AND function_selector =:function_selector",
@@ -141,16 +146,22 @@ impl Handler {
                         },
                     )?
                     .ok_or("Address not found")?;
-                protect_info_cache.selectors.push(selector.clone());
-                protect_info_cache
-                    .function_expressions
-                    .insert(index, param_expression);
-                protect_info_cache
-                    .function_selectors
-                    .insert(selector.clone(), index);
+                function_expressions.insert(index, param_expression);
             }
+            let protect_info_cache = ProtectInfoCache::init(
+                _address.clone(),
+                address_id,
+                invar_expression,
+                invar_expression_id,
+                unique_vec,
+                slot_map.clone(),
+                _selectors.clone(),
+                index_map,
+                function_expressions,
+            );
             protect_info_cache.print_all();
-            self.protect_infos.insert(_address, protect_info_cache);
+            self.protect_infos
+                .insert(_address.clone(), protect_info_cache);
         }
         Ok(())
     }
@@ -176,7 +187,7 @@ impl Handler {
             protect_addresses: _addresses.clone(),
             protect_infos: HashMap::new(),
         };
-        let _ = instance.insert_data_for_address(_addresses, _selectors);
+        let _ = instance.database_cache_init(_addresses, _selectors);
         println!("{}", Yellow.paint("---成功初始化数据库缓存"));
         println!();
         Ok(instance)
@@ -221,7 +232,7 @@ impl Handler {
         println!("-----------当前不变量 {}", Blue.paint(&expression.clone()));
         println!();
         // 处理表达式
-        let result = self.handle_exp(_address, expression).await;
+        let result = self.handle_exp2(_address, expression).await;
         Ok(result)
     }
 
@@ -236,10 +247,10 @@ impl Handler {
         &self,
         _address: &str,
         _state_names: Vec<String>,
-    ) -> Result<Vec<U256>, Box<dyn std::error::Error>> {
+    ) -> Result<HashMap<String, U256>, Box<dyn std::error::Error>> {
         // 读取缓存
         let _protect_info = self.protect_infos.get(_address).unwrap();
-        let mut values: Vec<U256> = Vec::new();
+        let mut values = HashMap::new();
         // 遍历所有变量名
         for name in _protect_info.state_variables.iter() {
             // 获取slot
@@ -249,7 +260,7 @@ impl Handler {
             // 如果是balance
             if name.eq("address(this).balance") {
                 let balance = self.rpc_connect.get_balance(_address, None).await?;
-                values.push(balance);
+                values.insert(name.to_string(), balance);
                 continue;
             }
             // 根据slot获取值
@@ -258,7 +269,7 @@ impl Handler {
                 .rpc_connect
                 .get_storage_at(_address, slot, None)
                 .await?;
-            values.push(U256::from_big_endian(value.as_bytes()));
+            values.insert(name.to_string(), U256::from_big_endian(value.as_bytes()));
         }
 
         Ok(values)
@@ -287,8 +298,10 @@ impl Handler {
             // 将原表达式中的每个变量替换为对应的值
             let mut new_expression = _expression.to_string();
             for i in 0..variables.len() {
-                new_expression =
-                    new_expression.replace(variables[i].as_str(), _values[i].to_string().as_str());
+                new_expression = new_expression.replace(
+                    variables[i].as_str(),
+                    _values.get(&variables[i]).unwrap().to_string().as_str(),
+                );
             }
             // println!("替换后，表达式为：{:?}", new_expression);
             // 计算表达式的值
@@ -296,7 +309,37 @@ impl Handler {
         }
         result
     }
+    pub async fn handle_exp2(&self, _address: &str, _expression: String) -> bool {
+        // 将表达式分割，以&&为分隔符
+        let _expression = _expression.replace(" ", "");
+        let mut result = true;
+        // 获得所有变量
+        let variables = self
+            .protect_infos
+            .get(_address)
+            .unwrap()
+            .state_variables
+            .clone();
+        // 获得所有变量的值
+        let mut _values = self
+            .get_values_with_names(_address, variables.clone())
+            .await
+            .unwrap();
+        // 将表达式中的每个变量替换为对应的值
+        let mut new_expression = _expression.to_string();
+        for var in variables.iter() {
+            new_expression =
+                new_expression.replace(var, _values.get(var).unwrap().to_string().as_str());
+        }
+        println!("替换后的表达式为：{}", new_expression);
+        let _expressions: Vec<&str> = new_expression.split("&&").collect();
 
+        // 分别处理每个表达式
+        for _expression in _expressions {
+            result = result && parse_expression(_expression);
+        }
+        result
+    }
     // 主要函数，入口
     pub async fn handle(self: &Arc<Self>) -> Result<(), Box<dyn std::error::Error>> {
         // 进行监听
@@ -307,7 +350,6 @@ impl Handler {
                 "-----当前区块为 {}",
                 Yellow.paint(&block.number.unwrap().to_string())
             );
-            // todo 在这里先检查不变量
             // 记录不变量检测的开始时间
             let start = std::time::Instant::now();
             for address in self.protect_addresses.iter() {
@@ -422,8 +464,14 @@ impl Handler {
         // 将原表达式中的每个状态变量替换为对应的值，因此得到一个包含未知数和常数的表达式
         let mut new_expression: String = _expression.to_string();
         for i in 0.._values.len() {
-            new_expression =
-                new_expression.replace(variable_names[i].as_str(), _values[i].to_string().as_str());
+            new_expression = new_expression.replace(
+                variable_names[i].as_str(),
+                _values
+                    .get(&variable_names[i])
+                    .unwrap()
+                    .to_string()
+                    .as_str(),
+            );
         }
 
         // println!("替换后，表达式为：{:?}", new_expression);
@@ -465,17 +513,27 @@ impl Handler {
 }
 
 impl ProtectInfoCache {
-    pub fn new() -> Self {
+    pub fn init(
+        address: String,
+        address_id: i32,
+        invariant_expression: String,
+        invariant_expression_id: i32,
+        state_variables: Vec<String>,
+        slot_map: HashMap<i32, HashMap<String, String>>,
+        selectors: Vec<String>,
+        index_map: HashMap<String, u8>,
+        function_expressions: HashMap<u8, String>,
+    ) -> Self {
         Self {
-            address: String::new(),
-            address_id: 0,
-            invariant_expression: String::new(),
-            invariant_expression_id: 0,
-            state_variables: Vec::new(),
-            slots: HashMap::new(),
-            selectors: Vec::new(),
-            function_selectors: HashMap::new(),
-            function_expressions: HashMap::new(),
+            address,
+            address_id,
+            invariant_expression,
+            invariant_expression_id,
+            state_variables,
+            slot_map,
+            selectors,
+            index_map,
+            function_expressions,
         }
     }
 
@@ -501,21 +559,19 @@ impl ProtectInfoCache {
 
     pub fn insert_slot(&mut self, _address: i32, _variable: String, _slot: String) {
         // 先判断是否存在
-        if self.slots.contains_key(&_address) {
-            println!("insert_slot if");
-            let mut _map = self.slots.get_mut(&_address).unwrap();
+        if self.slot_map.contains_key(&_address) {
+            let mut _map = self.slot_map.get_mut(&_address).unwrap();
             _map.insert(_variable, _slot);
         } else {
-            println!("insert_slot else");
-
             let mut _map = HashMap::new();
             _map.insert(_variable, _slot);
-            self.slots.insert(_address, _map);
+            self.slot_map.insert(_address, _map);
         }
     }
+
     pub fn get_slot(&self, _address: i32, _variable: String) -> Option<&String> {
-        if self.slots.contains_key(&_address) {
-            let _map = self.slots.get(&_address).unwrap();
+        if self.slot_map.contains_key(&_address) {
+            let _map = self.slot_map.get(&_address).unwrap();
             _map.get(&_variable)
         } else {
             None
@@ -525,7 +581,7 @@ impl ProtectInfoCache {
         self.function_expressions.get(_index)
     }
     pub fn get_index_with_selector(&self, _selector: &String) -> Option<&u8> {
-        self.function_selectors.get(_selector)
+        self.index_map.get(_selector)
     }
     pub fn print_all(&self) {
         // 输出一切
@@ -576,7 +632,7 @@ pub fn get_selector(bytes: &[u8]) -> String {
 //         .unwrap();
 // }
 
-fn remove_0x_prefix(hex_string: &str) -> &str {
+pub fn remove_0x_prefix(hex_string: &str) -> &str {
     if hex_string.starts_with("0x") || hex_string.starts_with("0X") {
         &hex_string[2..]
     } else {
@@ -584,7 +640,7 @@ fn remove_0x_prefix(hex_string: &str) -> &str {
     }
 }
 
-fn vec_remove_duplicates(old_vec: &mut Vec<String>) -> Vec<String> {
+pub fn vec_remove_duplicates(old_vec: &mut Vec<String>) -> Vec<String> {
     let new_vec: HashSet<_> = old_vec.drain(..).collect();
     // 如果需要的话，再将HashSet转换回Vec
     new_vec.into_iter().collect()
@@ -608,9 +664,9 @@ impl fmt::Display for ProtectInfoCache {
                 .collect::<Vec<_>>()
                 .join(", ")
         )?;
-        write!(f, "  Slots:\n")?;
+        write!(f, "  slot_map:\n")?;
 
-        for (address_id, variables) in &self.slots {
+        for (address_id, variables) in &self.slot_map {
             write!(f, "    Address ID: {} => [\n", address_id)?;
             for (variable, slot) in variables {
                 write!(f, "      Variable: \"{}\", Slot: \"{}\"\n", variable, slot)?;
@@ -629,7 +685,7 @@ impl fmt::Display for ProtectInfoCache {
         )?;
         write!(f, "  Function Selectors: [\n")?;
 
-        for (selector, index) in &self.function_selectors {
+        for (selector, index) in &self.index_map {
             write!(f, "    Selector: \"{}\", Index: {}\n", selector, index)?;
         }
 
