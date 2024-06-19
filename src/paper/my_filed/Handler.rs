@@ -1,26 +1,16 @@
-use crate::bytes::pad_left;
-use crate::debug::to_hex_string;
-use crate::op_codes::arithmetic::unsigned::add;
-use crate::paper::my_filed::expression::{evaluate_exp, evaluate_exp_with_unknown, find_max_min};
-use crate::paper::my_filed::parser;
+use crate::paper::my_filed::expression::{evaluate_exp_with_unknown, find_max_min};
 use crate::paper::my_filed::parser::parse_expression;
 use crate::paper::my_filed::sym_exec::sym_exec;
-use abi::Hash;
 use ansi_term::Colour::{Black, Blue, Cyan, Fixed, Green, Purple, Red, White, Yellow};
-use binlog::value;
 use ethers::abi::AbiEncode;
 use ethers::prelude::*;
 use ethers::types::{Block, Transaction};
 use mysql::prelude::Queryable;
 use mysql::*;
-use num_traits::ToBytes;
-use rayon::vec;
 use regex::bytes::Regex;
-use serde_json::to_string;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
-use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
@@ -312,30 +302,18 @@ impl Handler {
                 "-----当前区块为 {} ",
                 Yellow.paint(&block.number.unwrap().to_string())
             );
+            let temp: Vec<String> = self.protect_addresses.clone();
             // 记录不变量检测的开始时间
-            for address in self.protect_addresses.iter() {
+            for address in temp.into_iter() {
+                let self_clone: Arc<Handler> = Arc::clone(self);
                 let _block = block.clone();
-                let start = std::time::Instant::now();
-                let check_result = self.check_invariant(address.as_str()).await?;
-                let end = std::time::Instant::now();
-                println!(
-                    "检查不变量的时间为：{}",
-                    Yellow.paint(&format!("{:?}", end - start))
-                );
-                if check_result {
-                    println!("{}", Green.paint("Invariant is safe!"));
-                    println!();
-                } else {
-                    // todo 接下来的一系列动作
-                    println!("{}", Red.paint("Invariant is broken!"));
-                    println!();
-                    // 创建一个共享引用
-                    let self_clone: Arc<Handler> = Arc::clone(self);
-                    tokio::spawn(async move {
+                // 创建一个共享引用
+                tokio::spawn(async move {
+                    if !self_clone.check_invariant(&address.as_str()).await.unwrap() {
                         println!("check thread: {:?})", thread::current().id());
                         self_clone.protect_thread(_block).await.unwrap();
-                    });
-                }
+                    }
+                });
             }
         }
         Ok(())

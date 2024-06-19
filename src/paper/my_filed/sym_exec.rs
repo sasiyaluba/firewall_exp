@@ -1,33 +1,21 @@
-use crate::core_module::runner;
-//接口
-use crate::errors::ExecutionError;
-use crate::Runner;
-//第一步：根据txhash和rpc，将状态设置到EVM中
-use crate::bytes::{_hex_string_to_bytes, pad_left, to_h256};
+use crate::bytes::pad_left;
 use crate::core_module::context::account_state_ex_context::{
-    get_accounts_state_tx, get_tx_after_accounts_state, AccountStateEx, ISDiff,
+    get_accounts_state_tx, AccountStateEx, ISDiff,
 };
 use crate::core_module::context::evm_context::EvmContext;
 use crate::core_module::context::transaction_context::{get_transaction_content, TransactionEnv};
-use crate::paper::my_filed::expression::find_max_min;
-use crate::paper::strategy::param_strategy::get_range_temp;
-use crate::paper::tx_origin_data::get_origin_oplist::{
-    self, compare_list, get_opcode_list, get_opcode_list_str, get_pc_op,
-};
+use crate::errors::ExecutionError;
+use crate::paper::tx_origin_data::get_origin_oplist::compare_list;
 use crate::EvmState;
-use ansi_term::Colour::Red;
-use dotenv::dotenv;
-use ethers::prelude::{Http, Provider, ProviderError, ProviderExt, TxHash, Ws};
-use ethers::signers::LocalWallet;
-use ethers::types::{Bytes, Transaction, TransactionRequest, H256};
-use ethers_providers::Middleware;
+use crate::Runner;
+use ethers::prelude::{Provider, ProviderError, TxHash, Ws};
+use ethers::types::H256;
 use hex::FromHex;
-use num_traits::ToBytes;
 use primitive_types::H160;
 use std::collections::BTreeMap;
-use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
+
 pub async fn get_evm_interpreter(
     rpc: &str,
     tx_hash: &str,
@@ -38,12 +26,8 @@ pub async fn get_evm_interpreter(
     accounts_before_tx: Option<BTreeMap<H160, AccountStateEx>>,
     transaction_content: Option<TransactionEnv>,
 ) -> Result<Runner, ProviderError> {
-    // todo 执行前状态
     let accounts_before_tx: BTreeMap<H160, AccountStateEx> = accounts_before_tx.unwrap();
-
-    // todo 交易环境信息
     let transaction_content = transaction_content.unwrap();
-
     let state: EvmState;
     state = EvmState::new(None);
 
@@ -99,8 +83,6 @@ pub async fn get_evm_interpreter(
         .get_code_at(interpreter.address)
         .unwrap()
         .clone();
-    // 9. 在更新上下文的时候，是否选择将拉取最新的交易上下文更新到要执行的模块中
-    // todo! 拉取最新的区块链状态进行更新
     Ok(interpreter)
 }
 
@@ -136,7 +118,6 @@ pub async fn sym_exec(
     .unwrap();
     let _ = runner.interpret(runner.bytecode.clone(), false);
     let origin_address_pc_op = runner.address_pc_op.clone();
-    // todo 只拿一次状态
     // 替换执行
     for new_param in _param_range {
         let mut runner = get_evm_interpreter(
@@ -174,7 +155,6 @@ pub async fn get_prepare_info(
     let provider = Provider::<Ws>::connect(_rpc)
         .await
         .expect("rpc connect error");
-    // todo 执行前状态
     let accounts_before_tx = get_accounts_state_tx(
         Arc::from(provider.clone()),
         H256::from_str(_tx_hash).unwrap(),
@@ -182,7 +162,6 @@ pub async fn get_prepare_info(
     )
     .await;
 
-    // todo 交易环境信息
     let transaction_content =
         get_transaction_content(provider, TxHash::from_str(_tx_hash).unwrap())
             .await
