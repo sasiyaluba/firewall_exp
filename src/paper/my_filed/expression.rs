@@ -28,6 +28,9 @@ impl fmt::Display for ExpressionCaclError {
         }
     }
 }
+
+//reserveA + reserveB > 100&&reserveA > 10&&reserveB >10
+
 pub fn evaluate_exp(_expression: &str) -> Result<bool, ExpressionCaclError> {
     let _expression = _expression.replace(" ", "");
     let re = Regex::new(r"(\d+|[+*/()-])|>=|<=|>|<|!=|==").unwrap();
@@ -39,6 +42,7 @@ pub fn evaluate_exp(_expression: &str) -> Result<bool, ExpressionCaclError> {
     let result = evaluate_postfix(y);
     Ok(result >= BigInt::one())
 }
+
 pub fn get_precedence(op: &str) -> BigInt {
     match op {
         "+" | "-" => BigInt::one(),
@@ -112,6 +116,7 @@ pub fn evaluate_postfix(tokens: Vec<String>) -> BigInt {
 
     stack.pop().unwrap()
 }
+
 pub fn get_all_variables(_expression: &str) -> Vec<String> {
     let re = Regex::new(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b").unwrap();
     re.find_iter(_expression.as_bytes())

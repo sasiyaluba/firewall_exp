@@ -8,7 +8,7 @@ use ethers::types::{Block, Transaction};
 use mysql::prelude::Queryable;
 use mysql::*;
 use regex::bytes::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -23,7 +23,12 @@ pub struct Handler {
     sql_connect: mysql::Pool,
     protect_addresses: Vec<String>,
     protect_infos: HashMap<String, ProtectInfoCache>,
+    // 区块信息队列
+    block_info:VecDeque<Block<Transaction>>
 }
+
+// todo 1.数据库使用说明 安装、版本、数据库设计、数据库与代码交互的教程  2.不用数据库的测试用例（硬编码的测试）
+// todo 新的线程，处理数据库轮询，数据库与本地代码的交互
 #[derive(Debug)]
 pub struct ProtectInfoCache {
     // 地址
@@ -45,11 +50,61 @@ pub struct ProtectInfoCache {
 }
 
 impl Handler {
+    // 初始化
+    pub async fn new(
+        _rpc: &'static str,
+        _sql_url: &'static str,
+        _addresses: Vec<String>,
+        _selectors: Vec<String>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let provider = Provider::<Ws>::connect(_rpc).await?;
+        println!();
+        println!("{}", Yellow.paint("---成功连接rpc节点"));
+        let rpc_connect = Arc::new(provider);
+        let sql_connect = mysql::Pool::new(_sql_url)?;
+        println!("{}", Yellow.paint("---成功连接数据库"));
+        println!();
+        let mut instance = Self {
+            rpc: _rpc,
+            sql_url: _sql_url,
+            rpc_connect,
+            sql_connect,
+            protect_addresses: _addresses.clone(),
+            protect_infos: HashMap::new(),
+        };
+        let _ = instance.database_cache_init(_addresses, _selectors);
+        println!("{}", Yellow.paint("---成功初始化数据库缓存"));
+        println!();
+        Ok(instance)
+    }
+
+    // 方法是获得区块信息
+    pub async fn get_block(self:&Arc<Self>) {
+        // 订阅区块
+        let mut block_stream = self.rpc_connect.subscribe_blocks().await?;
+        // 监听区块
+        while let Some(block) = block_stream.next().await {
+            // todo 将block信息添加到block信息队列
+            // todo 尝试接收反馈，接收成功则清理队列，否则先跳过
+        }
+    }
+
+    pub async fn block_thread(self:&Arc<Self>){
+        // todo 在这里开启新的线程轮询处理区块
+    }
+
+    pub async fn invariant_check_thread(self:&Arc<Self>){
+        // todo 顺序处理每个block，并给出反馈
+    }
+
+
+    // 保存数据库缓存到本地
     pub fn database_cache_init(
         &mut self,
         _addresses: Vec<String>,
         _selectors: Vec<String>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>>
+    {
         // 获取sql连接
         let mut connect = self.sql_connect.get_conn().unwrap();
 
@@ -96,14 +151,14 @@ impl Handler {
                     temp_map.insert(name.to_string(), name.to_string());
                 } else {
                     let _slot: String = connect
-                    .exec_first(
-                        "SELECT slot FROM variables WHERE variable_name = :variable_name AND expression_id = :expression_id",
-                        params! {
+                        .exec_first(
+                            "SELECT slot FROM variables WHERE variable_name = :variable_name AND expression_id = :expression_id",
+                            params! {
                             "variable_name" => name.as_str(),
                             "expression_id" => invar_expression_id.to_string()
                         },
-                    )?
-                    .ok_or("Variable name not found")?;
+                        )?
+                        .ok_or("Variable name not found")?;
                     temp_map.insert(name.to_string(), _slot);
                 }
                 // 如果已存在，先获得entry
@@ -119,14 +174,14 @@ impl Handler {
             let mut function_expressions = HashMap::new();
             //selectors
             for selector in _selectors.iter() {
-                let index:u8 = connect.exec_first(
+                let index: u8 = connect.exec_first(
                     "SELECT param_index FROM function_expressions WHERE address_id =:address_id AND function_selector =:function_selector",
                     params! {
                         "address_id" => address_id.to_string(),
                         "function_selector" => selector.as_str()
-                    },)?.ok_or("Address not found or funcSelector not found")?;
+                    }, )?.ok_or("Address not found or funcSelector not found")?;
                 index_map.insert(selector.to_string(), index);
-                let param_expression:String = connect
+                let param_expression: String = connect
                     .exec_first(
                         "SELECT expression FROM function_expressions WHERE address_id =:address_id AND function_selector =:function_selector",
                         params! {
@@ -155,31 +210,20 @@ impl Handler {
         Ok(())
     }
 
-    pub async fn new(
-        _rpc: &'static str,
-        _sql_url: &'static str,
-        _addresses: Vec<String>,
-        _selectors: Vec<String>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let provider = Provider::<Ws>::connect(_rpc).await?;
+    // 检查不变量是否异常
+    pub async fn check_invariant(
+        &self,
+        _address: &str,
+    ) -> Result<bool, Box<dyn std::error::Error>>
+    {
+        // 获得表达式
+        let protect_info = self.protect_infos.get(_address).unwrap();
+        let expression = protect_info.invariant_expression.clone();
+        println!("-----------当前不变量 {}", Blue.paint(&expression.clone()));
         println!();
-        println!("{}", Yellow.paint("---成功连接rpc节点"));
-        let rpc_connect = Arc::new(provider);
-        let sql_connect = mysql::Pool::new(_sql_url)?;
-        println!("{}", Yellow.paint("---成功连接数据库"));
-        println!();
-        let mut instance = Self {
-            rpc: _rpc,
-            sql_url: _sql_url,
-            rpc_connect,
-            sql_connect,
-            protect_addresses: _addresses.clone(),
-            protect_infos: HashMap::new(),
-        };
-        let _ = instance.database_cache_init(_addresses, _selectors);
-        println!("{}", Yellow.paint("---成功初始化数据库缓存"));
-        println!();
-        Ok(instance)
+        // 处理表达式
+        let result = self.handle_exp(_address, expression).await;
+        Ok(result)
     }
 
     // 获取范围
@@ -211,27 +255,13 @@ impl Handler {
         Ok((min, max, *index))
     }
 
-    // 检查不变量是否异常
-    pub async fn check_invariant(
-        &self,
-        _address: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
-        // 获得表达式
-        let protect_info = self.protect_infos.get(_address).unwrap();
-        let expression = protect_info.invariant_expression.clone();
-        println!("-----------当前不变量 {}", Blue.paint(&expression.clone()));
-        println!();
-        // 处理表达式
-        let result = self.handle_exp(_address, expression).await;
-        Ok(result)
-    }
-
     // 根据变量名获取值
     pub async fn get_values_with_names(
         &self,
         _address: &str,
         _state_names: Vec<String>,
-    ) -> Result<HashMap<String, U256>, Box<dyn std::error::Error>> {
+    ) -> Result<HashMap<String, U256>, Box<dyn std::error::Error>>
+    {
         // 读取缓存
         let _protect_info = self.protect_infos.get(_address).unwrap();
         let mut values = HashMap::new();
@@ -265,6 +295,7 @@ impl Handler {
         let _expression = _expression.replace(" ", "");
         let mut result = true;
         // 获得所有变量
+        //reserveA + reserveB > 100&&reserveA > 10&&reserveB >10
         let variables = self
             .protect_infos
             .get(_address)
@@ -292,6 +323,8 @@ impl Handler {
         result
     }
 
+    // todo: 多线程
+    // todo: 两个队列，一个队列存放错误信息的记录，一个队列存放
     // 主要函数，入口
     pub async fn handle(self: &Arc<Self>) -> Result<(), Box<dyn std::error::Error>> {
         // 进行监听
@@ -303,7 +336,6 @@ impl Handler {
                 Yellow.paint(&block.number.unwrap().to_string())
             );
             let temp: Vec<String> = self.protect_addresses.clone();
-            // 记录不变量检测的开始时间
             for address in temp.into_iter() {
                 let self_clone: Arc<Handler> = Arc::clone(self);
                 let _block = block.clone();
@@ -319,7 +351,7 @@ impl Handler {
         Ok(())
     }
 
-    // 区块检查
+    // 保护线程
     pub async fn protect_thread(
         &self,
         _now_block: Block<TxHash>,
@@ -356,8 +388,8 @@ impl Handler {
                     min,
                     max,
                 )
-                .await
-                .unwrap();
+                    .await
+                    .unwrap();
                 // 得到最值
                 let (max, min) = find_max_min(&kill_range).unwrap();
                 let origin_data = "d133576a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001046be12c000000000000000000000000008eaD3c2F184Bf64CDAa428653A17E287aa3addb5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a029e99f07000000000000000000000000000000000000000000000000000000000000000000000000000000004b00a35eb8cae62337f37fe561d7ff48987a4fed00000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222222222222200000000000000000000000000000000000000000000000000000000";
@@ -532,6 +564,7 @@ impl ProtectInfoCache {
         println!("{}", self);
     }
 }
+
 // 将字节数组转换为十六进制字符串
 pub fn get_selector(bytes: &[u8]) -> String {
     // 将字节数组转换为十六进制字符串（小写）

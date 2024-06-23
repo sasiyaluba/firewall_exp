@@ -167,10 +167,8 @@ pub async fn get_prepare_info(
             .await
             .expect("get transaction hash error");
 
-    // 7. set evm state NULL env
-    let mut evm_context = EvmContext::new(); // Adjust this based on your actual implementation
+    let mut evm_context = EvmContext::new(); 
 
-    // 8. update evm state env
     evm_context.gas_price = transaction_content.gas_price;
     evm_context.block_number = transaction_content.block_number;
     evm_context.basefee = transaction_content.basefee;

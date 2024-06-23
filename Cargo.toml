@@ -36,3 +36,4 @@ regex = "1.10.5"
 num-bigint = "0.4"
 num-traits = "0.2"
 ansi_term = "0.12"
+sqlx = { version = "0.7", features = ["mysql", "runtime-tokio" ] }
