@@ -12,6 +12,7 @@ description = "A blazingly fast in-memory Ethereum Virtual Machine (EVM) emulato
 #[macro_use]
 #extern crate dotenv_codegen;
 
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 colored = "2.0.4"
@@ -37,3 +38,7 @@ num-bigint = "0.4"
 num-traits = "0.2"
 ansi_term = "0.12"
 sqlx = { version = "0.7", features = ["mysql", "runtime-tokio" ] }
+derive_more = "0.99.18"
+threadpool = "1.8"
+local-ip-address = "0.6.1"
+num_cpus = "1.16.0"

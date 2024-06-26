@@ -1,111 +1,5 @@
-pub fn parse_expression(input: &str) -> bool {
-    // 去掉所有空格
-    let input = input.replace(" ", "");
-    let mut pos = 0;
-    let mut current_char = input.chars().next();
-
-    // 前进函数
-    fn advance(input: &str, pos: &mut usize, current_char: &mut Option<char>) {
-        *pos += 1;
-        if *pos < input.len() {
-            *current_char = input[*pos..].chars().next();
-        } else {
-            *current_char = None;
-        }
-    }
-
-    // 解析数字常量
-    fn number(input: &str, pos: &mut usize, current_char: &mut Option<char>) -> u128 {
-        let mut result = String::new();
-        // 只要当前的字符是数字，就一直读取
-        while let Some(c) = *current_char {
-            if c.is_digit(10) {
-                result.push(c);
-                advance(input, pos, current_char);
-            } else {
-                break;
-            }
-        }
-        // 将读取到的数字转换为u128类型
-        result.parse::<u128>().unwrap()
-    }
-
-    // 解析因子
-    fn factor(input: &str, pos: &mut usize, current_char: &mut Option<char>) -> u128 {
-        if let Some(c) = *current_char {
-            if c == '(' {
-                advance(input, pos, current_char);
-                let result = expr(input, pos, current_char);
-                if *current_char == Some(')') {
-                    advance(input, pos, current_char);
-                } else {
-                    println!("期望一个右括号");
-                }
-                result
-            } else if c.is_digit(10) {
-                number(input, pos, current_char)
-            } else {
-                panic!("当前字符不属于factor范围");
-            }
-        } else {
-            panic!("当前input已经解析完毕");
-        }
-    }
-
-    // 解析项
-    fn term(input: &str, pos: &mut usize, current_char: &mut Option<char>) -> u128 {
-        let mut result = factor(input, pos, current_char);
-        while let Some(c) = *current_char {
-            if c == '*' {
-                advance(input, pos, current_char);
-                result *= factor(input, pos, current_char);
-            } else if c == '/' {
-                advance(input, pos, current_char);
-                result /= factor(input, pos, current_char);
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    // 解析表达式
-    fn expr(input: &str, pos: &mut usize, current_char: &mut Option<char>) -> u128 {
-        let mut result = term(input, pos, current_char);
-        while let Some(c) = *current_char {
-            if c == '+' {
-                advance(input, pos, current_char);
-                result += term(input, pos, current_char);
-            } else if c == '-' {
-                advance(input, pos, current_char);
-                result -= term(input, pos, current_char);
-            } else if c == '>' {
-                advance(input, pos, current_char);
-                result = if *current_char == Some('=') {
-                    advance(input, pos, current_char);
-                    result >= term(input, pos, current_char)
-                } else {
-                    result > term(input, pos, current_char)
-                } as u128;
-            } else if c == '<' {
-                advance(input, pos, current_char);
-                result = if *current_char == Some('=') {
-                    advance(input, pos, current_char);
-                    result <= term(input, pos, current_char)
-                } else {
-                    result < term(input, pos, current_char)
-                } as u128;
-            } else {
-                break;
-            }
-        }
-        result
-    }
-
-    expr(&input, &mut pos, &mut current_char) > 0
-}
 use std::collections::HashMap;
-pub fn parse_expression2(input: &str, variables: Option<&HashMap<&str, i128>>) -> i128 {
+pub fn parse_expression(input: &str, variables: Option<&HashMap<&str, i128>>) -> i128 {
     // 去掉所有空格
     let input = input.replace(" ", "");
     let mut pos = 0;
@@ -263,7 +157,7 @@ fn main() {
     variables.insert("x1", 3);
     variables.insert("x2", 4);
     variables.insert("x3", 2);
-    let result = parse_expression2("x1 + x2 * x3 / (6 - 5)>100", Some(&variables));
+    let result = parse_expression("x1 + x2 * x3 / (6 - 5)>100", Some(&variables));
 
     println!("Result: {}", result); // 输出结果
 }

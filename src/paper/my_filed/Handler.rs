@@ -8,8 +8,8 @@ use ethers::types::{Block, Transaction};
 use mysql::prelude::Queryable;
 use mysql::*;
 use regex::bytes::Regex;
-use std::collections::{HashMap, VecDeque};
 use std::collections::HashSet;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -24,7 +24,7 @@ pub struct Handler {
     protect_addresses: Vec<String>,
     protect_infos: HashMap<String, ProtectInfoCache>,
     // 区块信息队列
-    block_info:VecDeque<Block<Transaction>>
+    // block_info: VecDeque<Block<Transaction>>,
 }
 
 // todo 1.数据库使用说明 安装、版本、数据库设计、数据库与代码交互的教程  2.不用数据库的测试用例（硬编码的测试）
@@ -78,33 +78,12 @@ impl Handler {
         Ok(instance)
     }
 
-    // 方法是获得区块信息
-    pub async fn get_block(self:&Arc<Self>) {
-        // 订阅区块
-        let mut block_stream = self.rpc_connect.subscribe_blocks().await?;
-        // 监听区块
-        while let Some(block) = block_stream.next().await {
-            // todo 将block信息添加到block信息队列
-            // todo 尝试接收反馈，接收成功则清理队列，否则先跳过
-        }
-    }
-
-    pub async fn block_thread(self:&Arc<Self>){
-        // todo 在这里开启新的线程轮询处理区块
-    }
-
-    pub async fn invariant_check_thread(self:&Arc<Self>){
-        // todo 顺序处理每个block，并给出反馈
-    }
-
-
     // 保存数据库缓存到本地
     pub fn database_cache_init(
         &mut self,
         _addresses: Vec<String>,
         _selectors: Vec<String>,
-    ) -> Result<(), Box<dyn std::error::Error>>
-    {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // 获取sql连接
         let mut connect = self.sql_connect.get_conn().unwrap();
 
@@ -214,8 +193,7 @@ impl Handler {
     pub async fn check_invariant(
         &self,
         _address: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>>
-    {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         // 获得表达式
         let protect_info = self.protect_infos.get(_address).unwrap();
         let expression = protect_info.invariant_expression.clone();
@@ -260,8 +238,7 @@ impl Handler {
         &self,
         _address: &str,
         _state_names: Vec<String>,
-    ) -> Result<HashMap<String, U256>, Box<dyn std::error::Error>>
-    {
+    ) -> Result<HashMap<String, U256>, Box<dyn std::error::Error>> {
         // 读取缓存
         let _protect_info = self.protect_infos.get(_address).unwrap();
         let mut values = HashMap::new();
@@ -291,7 +268,6 @@ impl Handler {
 
     // 表达式处理
     pub async fn handle_exp(&self, _address: &str, _expression: String) -> bool {
-        // 将表达式分割，以&&为分隔符
         let _expression = _expression.replace(" ", "");
         let mut result = true;
         // 获得所有变量
@@ -318,7 +294,7 @@ impl Handler {
 
         // 分别处理每个表达式
         for _expression in _expressions {
-            result = result && parse_expression(_expression);
+            result = result && (parse_expression(_expression, None) > 0);
         }
         result
     }
@@ -388,8 +364,8 @@ impl Handler {
                     min,
                     max,
                 )
-                    .await
-                    .unwrap();
+                .await
+                .unwrap();
                 // 得到最值
                 let (max, min) = find_max_min(&kill_range).unwrap();
                 let origin_data = "d133576a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001046be12c000000000000000000000000008eaD3c2F184Bf64CDAa428653A17E287aa3addb5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a029e99f07000000000000000000000000000000000000000000000000000000000000000000000000000000004b00a35eb8cae62337f37fe561d7ff48987a4fed00000000000000000000000000000000000000000000000000000000000000001111111111111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222222222222200000000000000000000000000000000000000000000000000000000";
